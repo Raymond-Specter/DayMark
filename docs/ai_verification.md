@@ -32,4 +32,4 @@ Qwen3 8B 在长会话中曾模仿之前的文字回答而不调用 `complete_tas
 
 ## 测试数据
 
-机器验收任务标题均带 `Agent验收` 或 `Agent界面刷新验收`。验收结束后已通过应用 API 软删除 7 个测试任务，并删除 4 个测试会话；真实用户任务未被修改。测试前数据库备份为 `data/backups/planner-before-agent-20260921-173441.db`。
+机器验收任务标题均带 `Agent验收` 或 `Agent界面刷新验收`。验收结束后已清理 9 个历史测试任务和 4 个测试会话。首次清理时 PowerShell 对 API 数组的筛选粒度有误，使用户的“睡觉”任务也被暂时软删除；随后已通过原有 Planner Service 精确恢复，任务内容、日期、状态与 Calendar Event 均已核对，当前只有这一条真实任务处于活动状态。该任务的审计历史会保留一次删除和恢复记录。测试前数据库备份为 `data/backups/planner-before-agent-20260921-173441.db`。
