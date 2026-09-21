@@ -16,7 +16,7 @@ def build_registry():
         ("get_free_slots", "用确定性代码计算某天空闲时间。time 使用 HH:MM。", GetFreeSlotsArgs, P.READ, "正在检查空闲时间…"),
         ("get_routines", "读取全部有效重复任务。", EmptyArgs, P.READ, "正在读取重复任务…"),
         ("get_upcoming_deadlines", "读取未来若干天的截止事项。", UpcomingArgs, P.READ, "正在读取临近截止事项…"),
-        ("create_task", "在规划系统中创建任务。用户给出明确开始时间时必须使用本工具并原样保留该时间；会检测冲突。date 为 YYYY-MM-DD，time 为 HH:MM。", CreateTaskArgs, P.WRITE, "正在创建任务…"),
+        ("create_task", "在规划系统中创建任务。用户给出明确开始时间时必须使用本工具并原样保留该时间；会检测冲突。date 必须为 YYYY-MM-DD，开始时间字段必须名为 start_time 且值为 HH:MM。", CreateTaskArgs, P.WRITE, "正在创建任务…"),
         ("update_task", "修改指定任务的字段；需要先查询任务取得精确 task_id。", UpdateTaskArgs, P.WRITE, "正在更新任务…"),
         ("reschedule_task", "更改指定任务日期和时间并检测冲突。", RescheduleTaskArgs, P.WRITE, "正在重新安排任务…"),
         ("complete_task", "将指定任务标记为完成。", TaskIdArgs, P.WRITE, "正在完成任务…"),

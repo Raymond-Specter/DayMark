@@ -1,4 +1,5 @@
 import json
+from datetime import date, timedelta
 
 from fastapi import HTTPException
 from pydantic import ValidationError
@@ -21,6 +22,7 @@ class ToolExecutor:
         try:
             if isinstance(arguments, str):
                 arguments = json.loads(arguments)
+            arguments = self._normalize_arguments(name, arguments or {})
             checked = definition.arguments.model_validate(arguments or {})
         except (ValidationError, ValueError, TypeError, json.JSONDecodeError):
             return ToolResult(success=False, error_code="INVALID_ARGUMENTS",
@@ -91,6 +93,22 @@ class ToolExecutor:
         if isinstance(error, ValueError):
             return str(error)[:300]
         return "工具执行失败，数据未修改。"
+
+    @staticmethod
+    def _normalize_arguments(name, arguments):
+        if not isinstance(arguments, dict):
+            return arguments
+        normalized = dict(arguments)
+        if name == "create_task":
+            # Qwen occasionally follows the human word "time" even though the
+            # advertised schema says start_time. This alias is unambiguous.
+            if "time" in normalized and "start_time" not in normalized:
+                normalized["start_time"] = normalized.pop("time")
+            # In Chinese usage, "今晚24点" means 00:00 of the next calendar day.
+            if normalized.get("start_time") == "24:00" and normalized.get("date"):
+                normalized["date"] = (date.fromisoformat(normalized["date"]) + timedelta(days=1)).isoformat()
+                normalized["start_time"] = "00:00"
+        return normalized
 
     @staticmethod
     def _description(name, arguments):

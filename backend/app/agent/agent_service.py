@@ -1,4 +1,5 @@
 import json
+import re
 from pathlib import Path
 
 from sqlalchemy import select
@@ -39,6 +40,7 @@ class AgentService:
 
     async def run(self, conversation_id, messages, options, emit):
         affected, confirmation, metrics = [], None, {}
+        failed_calls = {}
         working = list(messages)
         user_text = next((message.content for message in reversed(working) if message.role == "user"), "")
         requires_tool = self._requires_tool(user_text)
@@ -80,6 +82,7 @@ class AgentService:
             for call in calls:
                 function = call.get("function", {})
                 name, arguments = function.get("name", ""), function.get("arguments", {})
+                arguments = self._normalize_tool_arguments(name, arguments, user_text)
                 definition = self.registry.definitions.get(name)
                 status = definition.status_text if definition else "正在处理操作…"
                 await emit({"event": "tool_status", "tool": name, "message": status})
@@ -91,11 +94,20 @@ class AgentService:
                             "confirmation": result.confirmation})
                 call_id = call.get("id") or f"{name}-{len(working)}"
                 working.append(Message("tool", result.model_dump_json(), tool_call_id=call_id))
+                if not result.success and not result.confirmation:
+                    signature = json.dumps({"tool": name, "arguments": arguments,
+                                            "error_code": result.error_code}, ensure_ascii=False, sort_keys=True)
+                    failed_calls[signature] = failed_calls.get(signature, 0) + 1
+                    if failed_calls[signature] >= 2:
+                        return AgentOutcome(
+                            content=f"无法执行这个操作：{result.message}", metrics=metrics,
+                            affected_entities=self._unique(affected), confirmation=confirmation)
         raise LLMError("tool_loop_limit", "工具调用次数过多，已停止且保留已经成功完成的操作。", 409)
 
     @staticmethod
     def _requires_tool(text):
-        markers = ("安排", "创建", "改到", "改期", "重新安排", "完成", "取消", "撤销", "删除", "暂停",
+        markers = ("安排", "创建", "添加", "新增", "加入", "加到", "加上去", "记到", "放到",
+                   "改到", "改期", "重新安排", "完成", "取消", "撤销", "删除", "暂停",
                    "有哪些任务", "什么任务", "查看任务", "查询任务", "空闲时间", "日历", "截止", "重复任务")
         return any(marker in text for marker in markers)
 
@@ -115,13 +127,30 @@ class AgentService:
             names = {"get_tasks", "reschedule_task", "update_task"}
         elif "重复" in text or "Routine" in text or "routine" in text:
             names = {"get_routines", "create_routine", "update_routine", "pause_routine"}
-        elif any(marker in text for marker in ("安排", "创建", "找个时间")):
+        elif any(marker in text for marker in ("安排", "创建", "添加", "新增", "加入", "加到", "加上去", "记到", "放到", "找个时间")):
             names = {"get_free_slots", "create_task", "schedule_task"}
         elif "今天" in text and "任务" in text:
             names = {"get_today_tasks"}
         if "截止" in text:
             names = {"get_upcoming_deadlines"}
         return [self.registry.definitions[name].provider_schema() for name in names if name in self.registry.definitions]
+
+    @staticmethod
+    def _normalize_tool_arguments(name, arguments, user_text):
+        if name != "create_task" or not isinstance(arguments, dict):
+            return arguments
+        normalized = dict(arguments)
+        start_time = normalized.get("start_time") or normalized.get("time")
+        explicit_duration = re.search(r"\d+(?:\.\d+)?\s*(?:分钟|小时|min(?:ute)?s?|hours?)", user_text, re.IGNORECASE)
+        if start_time and not normalized.get("end_time") and not explicit_duration:
+            if re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", start_time):
+                hour, minute = map(int, start_time.split(":"))
+                duration = normalized.get("duration_minutes", 30)
+                remaining = 23 * 60 + 59 - (hour * 60 + minute)
+                if isinstance(duration, int) and 0 < remaining < duration:
+                    normalized["duration_minutes"] = remaining
+                    normalized["end_time"] = "23:59"
+        return normalized
 
     @staticmethod
     def _unique(rows):

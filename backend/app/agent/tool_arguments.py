@@ -63,8 +63,8 @@ class UpcomingArgs(ToolArguments):
 class CreateTaskArgs(ToolArguments):
     title: str = Field(min_length=1, max_length=200)
     date: str
-    start_time: str | None = None
-    end_time: str | None = None
+    start_time: str | None = Field(default=None, description="任务开始时间，格式 HH:MM；字段名必须是 start_time")
+    end_time: str | None = Field(default=None, description="任务结束时间，格式 HH:MM；字段名必须是 end_time")
     duration_minutes: int = Field(default=30, ge=1, le=1440)
     project_id: str | None = None
     priority: int = Field(default=2, ge=1, le=3)

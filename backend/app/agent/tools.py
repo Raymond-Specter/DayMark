@@ -80,7 +80,12 @@ class PlanningTools:
             return Handled(ToolResult(success=False, error_code="TIME_CONFLICT",
                                       message="指定时间与现有日历事项冲突。", data={"conflicts": conflicts}))
         entity = {"type": "task", "id": task.id}
-        return self.ok(f"已创建任务“{task.title}”。", task_dict(self.db, task), [entity], None, raw(task))
+        timing = task.date
+        if task.start_time:
+            timing += f" {task.start_time}–{task.end_time}"
+        return self.ok(
+            f"已创建任务“{task.title}”：{timing}，预计 {task.estimated_duration} 分钟。",
+            task_dict(self.db, task), [entity], None, raw(task))
 
     def update_task(self, args):
         task = require(self.db, Task, args.task_id)

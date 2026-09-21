@@ -157,3 +157,58 @@ def test_routine_tools_create_update_and_pause(session_factory):
     with session_factory() as db:
         routine = db.get(Routine, created.data["id"])
         assert routine and routine.active is False and routine.preferred_time == "08:30"
+
+
+def test_add_to_calendar_phrase_exposes_create_task_and_normalizes_midnight(session_factory):
+    registry, tools = executor(session_factory)
+    agent = AgentService(None, registry, tools, session_factory)
+    schemas = agent._tool_schemas("今天晚上24点学习，把它加到任务和日历中")
+    assert "create_task" in {item["function"]["name"] for item in schemas}
+    with session_factory() as db:
+        conversation = Conversation(); db.add(conversation); db.commit(); key = conversation.id
+    result = tools.execute(key, "create_task", {
+        "title": "午夜任务", "date": "2026-09-21", "time": "24:00", "duration_minutes": 30,
+    })
+    assert result.success
+    assert "2026-09-22 00:00–00:30，预计 30 分钟" in result.message
+    assert (result.data["date"], result.data["start_time"], result.data["end_time"]) == (
+        "2026-09-22", "00:00", "00:30")
+
+
+def test_repeated_identical_tool_failure_stops_with_useful_message(session_factory):
+    async def run():
+        with session_factory() as db:
+            conversation = Conversation(); db.add(conversation); db.commit()
+        failed_call = ChatChunk(tool_calls=[{"function": {"name": "create_task", "arguments": {
+            "title": "非法时间", "date": "2026-09-21", "start_time": "25:00",
+        }}}], done=True)
+        provider = ScriptedProvider([failed_call, failed_call])
+        registry, tool_executor = executor(session_factory)
+        agent = AgentService(LLMService(provider), registry, tool_executor, session_factory)
+        outcome = await agent.run(
+            conversation.id, [Message("system", "test"), Message("user", "把任务加上去")],
+            GenerationOptions(), lambda event: asyncio.sleep(0))
+        assert "无法执行这个操作" in outcome.content
+        assert len(provider.requests) == 2
+    asyncio.run(run())
+
+
+def test_late_task_without_duration_is_created_before_midnight(session_factory):
+    async def run():
+        with session_factory() as db:
+            conversation = Conversation(); db.add(conversation); db.commit()
+        call = ChatChunk(tool_calls=[{"function": {"name": "create_task", "arguments": {
+            "title": "学习cs336", "date": "2026-09-21", "time": "23:45", "duration_minutes": 60,
+        }}}], done=True)
+        provider = ScriptedProvider([call, ChatChunk(content="已经添加。", done=True)])
+        registry, tool_executor = executor(session_factory)
+        agent = AgentService(LLMService(provider), registry, tool_executor, session_factory)
+        outcome = await agent.run(
+            conversation.id,
+            [Message("system", "test"), Message("user", "今天晚上23点45要学习cs336，在任务和日历中加上去")],
+            GenerationOptions(), lambda event: asyncio.sleep(0))
+        assert outcome.content == "已经添加。"
+        with session_factory() as db:
+            task = db.scalar(select(Task).where(Task.title == "学习cs336"))
+            assert task and (task.start_time, task.end_time, task.estimated_duration) == ("23:45", "23:59", 14)
+    asyncio.run(run())
