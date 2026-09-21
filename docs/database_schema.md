@@ -90,6 +90,25 @@ Task 可有一个对应的 Calendar Event；不关联 Task 的事件是独立日
 
 `settings`：单行 `id=1`，`timezone` 默认为 `Asia/Shanghai`，`day_start` 默认为 `09:00`。
 
-## 备份
+## AI 聊天（迁移 0002 / 0003）
+
+| 表 | 字段与约束 |
+| --- | --- |
+| conversations | id、title、created_at、updated_at |
+| chat_messages | id、conversation_id（CASCADE）、position、role、content、status、model、duration_ms、error、created_at、updated_at；会话内 position 唯一 |
+| ai_settings | 单行 id=1，model、num_ctx、temperature、think；不含凭证 |
+
+role 支持 system/user/assistant/tool，但系统提示不写入聊天表。status 支持 generating/completed/stopped/error。position 保证时间戳相同时消息顺序稳定。与规划表无外键，不允许模型直接查询或修改业务数据。
+
+## Agent 操作（迁移 0004）
+
+| 表 | 字段与约束 |
+| --- | --- |
+| agent_action_logs | conversation_id、tool_name、tool_arguments JSON、permission_level、status、before_state / after_state JSON、affected_entities JSON、error_message、undone_at、created_at |
+| pending_agent_actions | conversation_id、tool_name、tool_arguments JSON、description、affected_count、status、resolved_at、created_at |
+
+每次 WRITE / DESTRUCTIVE Tool 都记录成功、拒绝或错误。待确认动作保存精确参数，确认接口只执行该记录。Undo 使用 before_state 恢复，并以 undone_at 防止重复撤销。
+
+## 备份方式
 
 启用 WAL 时不要直接复制运行中的主数据库文件。`backup.ps1` 使用 Python 标准库 `sqlite3.Connection.backup()` 得到一致性副本，并执行 `PRAGMA integrity_check`。JSON 导出用于查看与迁移参考；完整恢复以 SQLite 备份为准，第一版没有自动 JSON 导入。

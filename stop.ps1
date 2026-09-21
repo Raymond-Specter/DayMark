@@ -1,11 +1,13 @@
 [CmdletBinding()]
-param()
+param([switch]$IncludeAI)
 
 $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath($PSScriptRoot)
 $runtimePath = Join-Path $workspace '.runtime'
 
-foreach ($serviceName in @('frontend', 'backend')) {
+$serviceNames = @('frontend', 'backend')
+if ($IncludeAI) { $serviceNames += 'ollama' }
+foreach ($serviceName in $serviceNames) {
     $statePath = Join-Path $runtimePath "$serviceName.json"
     if (-not (Test-Path -LiteralPath $statePath)) {
         Write-Host "No managed $serviceName process is recorded."
@@ -42,8 +44,14 @@ foreach ($serviceName in @('frontend', 'backend')) {
         $processToStop = Get-Process -Id $managedIds[$index] -ErrorAction SilentlyContinue
         $recordedProcess = $allProcesses | Where-Object ProcessId -eq $managedIds[$index]
         if ($processToStop -and $recordedProcess -and [Math]::Abs(($processToStop.StartTime - $recordedProcess.CreationDate).TotalSeconds) -lt 1) {
-            Stop-Process -Id $processToStop.Id
-            $processToStop.WaitForExit(10000) | Out-Null
+            try {
+                Stop-Process -Id $processToStop.Id -ErrorAction Stop
+                $processToStop.WaitForExit(10000) | Out-Null
+            }
+            catch {
+                # A parent can exit naturally just after its child was stopped.
+                if (Get-Process -Id $processToStop.Id -ErrorAction SilentlyContinue) { throw }
+            }
         }
     }
     Remove-Item -LiteralPath $statePath

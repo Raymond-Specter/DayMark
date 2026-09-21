@@ -54,7 +54,33 @@ Push-Location .\backend
 Pop-Location
 ```
 
-任务计划程序的“程序”填写项目内 `.venv\Scripts\python.exe` 的绝对路径，“参数”填写 `-m app.reminder_cli`，“起始于”填写 `backend` 的绝对路径。应用没有永久运行的 Python 提醒循环。Google Calendar 与 AI 接口仅预留边界，尚未接入或请求任何账户权限。
+任务计划程序的“程序”填写项目内 `.venv\Scripts\python.exe` 的绝对路径，“参数”填写 `-m app.reminder_cli`，“起始于”填写 `backend` 的绝对路径。应用没有永久运行的 Python 提醒循环。Google Calendar 尚未接入；本地 AI 的使用方式见下节，无需外部账户。
+
+## 本地 AI Assistant
+
+使用 Ollama 的 `qwen3:8b`，默认 8192 context、temperature 0.6、Thinking Off。所有 Ollama 程序、模型、状态文件均放在项目下，不需要管理员权限，也不修改系统环境变量。
+
+```powershell
+# 首次显式安装项目内的 Ollama、启动服务并下载模型（需要数 GB 下载）
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_ollama.ps1 -Install -Start -Pull
+
+# 此后统一启动 Ollama + 已构建的项目
+powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
+
+# 仅检查（不会偷偷安装或下载）
+.\scripts\setup_ollama.ps1
+
+# 停止项目和项目管理的 Ollama，保留全部数据
+.\stop.ps1 -IncludeAI
+```
+
+打开 [AI Assistant](http://127.0.0.1:3000/assistant)，可以用自然语言查询或操作 Task、Calendar 和 Routine。Agent 通过受控工具调用现有业务 Service，成功后页面自动刷新；明确时间会检查冲突，删除和大批量改期需要确认，最近的任务操作可以撤销。模型不能直接执行 SQL，也不会修改 Goal。Thinking 开启时仍不展示内部推理。
+
+安装位置：`runtime/ollama/`；模型：`models/ollama/`；模型临时文件与身份文件：`.runtime/ollama-*`；日志：`logs/ollama.*.log`。以上均不会进入 Git。环境变量默认值可参考 `.env.example`，如需修改复制为根目录 `.env`，不要提交真实 `.env`。页面保存的模型设置优先于环境默认值，API 地址和超时修改后重启后端生效。
+
+`setup_ollama.ps1 -Install -Start -Pull -DirectNetwork` 可在代理失效而网络可直连时使用；只影响本次进程与它启动的 Ollama。已运行的 Ollama 仍使用启动时的网络设置。安装包校验 SHA256 后才解压。下载模型失败可以重跑以续传。
+
+独立启动模型可运行 `.\scripts\setup_ollama.ps1 -Start`；后端和前端仍由 `.\start.ps1` 启动。独立调试命令、接口和验收说明见 [AI 使用说明](docs/ai_usage.md) 与 [AI 架构](docs/ai_architecture.md)。
 
 这是供单人本机使用的 MVP，服务仅监听 `127.0.0.1`，没有登录或多用户隔离。若日后放到公网或局域网，必须先补充认证、权限、HTTPS 和部署配置。
 
@@ -87,5 +113,9 @@ npm.cmd run dev
 - [API 设计](docs/api.md)
 - [项目目录](docs/project_structure.md)
 - [验收记录](docs/verification.md)
+- [本地 AI 架构](docs/ai_architecture.md)
+- [本地 AI 使用与开发说明](docs/ai_usage.md)
+- [本地 AI 文件变更清单](docs/ai_changes.md)
+- [本地 AI 验收记录](docs/ai_verification.md)
 
 实现采用 Next.js、React、FullCalendar、FastAPI、SQLAlchemy、Alembic 和 SQLite。设计参考：[Next.js 官方安装文档](https://nextjs.org/docs/app/getting-started/installation)、[FullCalendar React 接入](https://fullcalendar.io/docs/v6/react)、[拖动与缩放](https://fullcalendar.io/docs/v6/event-dragging-resizing)、[FastAPI 生命周期](https://fastapi.tiangolo.com/advanced/events/)、[SQLAlchemy 2.0](https://docs.sqlalchemy.org/en/20/)。

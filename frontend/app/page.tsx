@@ -49,6 +49,9 @@ import {
   ProgressRing,
 } from "@/components/Progress";
 import { Dashboard, DailyReview, SettingsPage } from "@/components/Insights";
+const Assistant = dynamic(() => import("@/components/assistant/Assistant"), {
+  ssr: false,
+});
 const CalendarView = dynamic(() => import("@/components/CalendarView"), {
   ssr: false,
   loading: () => <div className="panel loading-panel">正在加载日历…</div>,
@@ -62,6 +65,7 @@ type Page =
   | "routines"
   | "review"
   | "dashboard"
+  | "assistant"
   | "settings";
 const pages: {
   id: Page;
@@ -118,6 +122,13 @@ const pages: {
     english: "Insights",
     subtitle: "看见投入，也看见一点一滴的成长。",
     icon: BarChart3,
+  },
+  {
+    id: "assistant",
+    title: "AI Assistant",
+    english: "Local AI",
+    subtitle: "与本地 AI 理清想法，让下一步更清晰。",
+    icon: Sparkles,
   },
   {
     id: "settings",
@@ -213,7 +224,9 @@ export default function Home() {
     initialize();
   }, [initialize]);
   useEffect(() => {
-    const hash = window.location.hash.slice(1);
+    const hash =
+      window.location.hash.slice(1) ||
+      (window.location.pathname === "/assistant" ? "assistant" : "today");
     if (pages.some((p) => p.id === hash)) setPage(hash as Page);
     const handler = () => {
       const next = window.location.hash.slice(1);
@@ -422,16 +435,19 @@ export default function Home() {
             </button>
           ))}
           <span className="nav-caption second">看得更远</span>
-          {pages.slice(3, 7).map((p) => (
-            <button
-              key={p.id}
-              onClick={() => navigate(p.id)}
-              className={page === p.id ? "active" : ""}
-            >
-              <p.icon size={19} />
-              <span>{p.title}</span>
-            </button>
-          ))}
+          {pages
+            .slice(3)
+            .filter((p) => p.id !== "settings")
+            .map((p) => (
+              <button
+                key={p.id}
+                onClick={() => navigate(p.id)}
+                className={page === p.id ? "active" : ""}
+              >
+                <p.icon size={19} />
+                <span>{p.title}</span>
+              </button>
+            ))}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-note">
@@ -563,7 +579,9 @@ export default function Home() {
               </div>
               <p>{currentPage.subtitle}</p>
             </div>
-            {!["review", "dashboard", "settings"].includes(page) && (
+            {!["review", "dashboard", "settings", "assistant"].includes(
+              page,
+            ) && (
               <button
                 className="button primary"
                 disabled={!data}
@@ -587,7 +605,9 @@ export default function Home() {
               </button>
             )}
           </div>
-          {loading ? (
+          {page === "assistant" ? (
+            <Assistant changed={() => void refresh()} />
+          ) : loading ? (
             <div className="panel loading-panel">
               <LoaderCircle className="spin" size={28} />
               <h2>正在准备你的规划空间</h2>
@@ -1119,7 +1139,11 @@ export default function Home() {
                   stats={stats}
                   range={range}
                   setRange={(next) => {
-                    if ((Date.parse(next.end) - Date.parse(next.start)) / 86400000 > 366) {
+                    if (
+                      (Date.parse(next.end) - Date.parse(next.start)) /
+                        86400000 >
+                      366
+                    ) {
                       notify("一次最多查看 367 天，请缩小统计范围", true);
                       return;
                     }

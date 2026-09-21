@@ -18,6 +18,8 @@ from .services.planner import PlannerService
 from .services.reminder import ReminderService
 from .services.scheduler import SchedulerService
 from .services.statistics import StatisticsService
+from .api.ai import router as ai_router, service_instance as get_ai_service
+from .models import ChatMessage
 
 
 @asynccontextmanager
@@ -27,11 +29,17 @@ async def lifespan(app):
         settings(db)
         SchedulerService(db).materialize()
         ReminderService(db).dispatch()
+        db.execute(update(ChatMessage).where(ChatMessage.status == "generating").values(status="stopped", error="后端重启，已保留上次保存的部分回答。"))
         db.commit()
     yield
+    if get_ai_service.cache_info().currsize:
+        service = get_ai_service()
+        if service.active:
+            await service.stop(service.active.conversation_id)
 
 
 app = FastAPI(title="Personal Planning System", version="1.0.0", lifespan=lifespan)
+app.include_router(ai_router)
 
 
 @app.middleware("http")
@@ -70,7 +78,7 @@ def commit(db):
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
     settings(db)
-    return {"status": "ok", "service": "personal-planning", "schema": "0001"}
+    return {"status": "ok", "service": "personal-planning", "schema": "0004"}
 
 
 @app.get("/api/bootstrap")

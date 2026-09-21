@@ -63,7 +63,9 @@ Routine B 依赖 A 且 `offset_days=1` 时，B 原始日期 D 对应 A 原始日
 
 ## 扩展边界
 
-AI Planner / Replanner 将作为独立建议生成服务，通过已有任务 API 应用用户接受的结果。Weekly Review、考试/求职/学业模块可关联现有 Goal / Project / Milestone / Task，不改写基础调度。外部日历利用 `provider` 与 `external_id` 关联；实际 OAuth、同步冲突与推送凭证不进入第一阶段。
+本地 AI Assistant 已升级为受控 Agent，详见 [AI 架构](ai_architecture.md)。它通过 Tool Registry 与 Tool Executor 调用现有 Planner、Scheduler 和 Calendar Service；所有参数先验证，写入带日志，破坏性动作保存后确认。Calendar、Task 等模块仍不依赖模型可用性。
+
+当前 Planner Tool 已提供确定性 free-slot 与单日简单 replan。未来可在同一 Service 边界增加更复杂优化、Weekly Review 和 Knowledge Base；考试/求职/学业模块仍只关联现有 Goal / Project / Milestone / Task。外部日历利用 `provider` 与 `external_id` 关联；实际 OAuth、同步冲突与推送凭证不进入第一阶段。
 
 ## 本地部署
 

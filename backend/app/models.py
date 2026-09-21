@@ -167,3 +167,59 @@ class Settings(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
     timezone: Mapped[str] = mapped_column(String, default="Asia/Shanghai")
     day_start: Mapped[str] = mapped_column(String(5), default="09:00")
+
+
+class Conversation(Record, Base):
+    __tablename__ = "conversations"
+    title: Mapped[str] = mapped_column(String(200), default="新对话")
+
+
+class ChatMessage(Record, Base):
+    __tablename__ = "chat_messages"
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
+    role: Mapped[str] = mapped_column(String)
+    position: Mapped[int] = mapped_column(Integer)
+    content: Mapped[str] = mapped_column(Text, default="")
+    status: Mapped[str] = mapped_column(String, default="completed")
+    model: Mapped[str | None] = mapped_column(String)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    error: Mapped[str | None] = mapped_column(Text)
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "position", name="uq_chat_position"),
+        CheckConstraint("role IN ('system','user','assistant','tool')", name="ck_chat_role"),
+        CheckConstraint("status IN ('generating','completed','stopped','error')", name="ck_chat_status"),
+    )
+
+
+class AISettings(Base):
+    __tablename__ = "ai_settings"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)
+    model: Mapped[str] = mapped_column(String(200))
+    num_ctx: Mapped[int] = mapped_column(Integer)
+    temperature: Mapped[str] = mapped_column(String, default="0.6")
+    think: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class AgentActionLog(Record, Base):
+    __tablename__ = "agent_action_logs"
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
+    tool_name: Mapped[str] = mapped_column(String(100), index=True)
+    tool_arguments: Mapped[dict] = mapped_column(JSON, default=dict)
+    permission_level: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(30), index=True)
+    before_state: Mapped[dict | None] = mapped_column(JSON)
+    after_state: Mapped[dict | None] = mapped_column(JSON)
+    affected_entities: Mapped[list] = mapped_column(JSON, default=list)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    undone_at: Mapped[str | None] = mapped_column(String)
+
+
+class PendingAgentAction(Record, Base):
+    __tablename__ = "pending_agent_actions"
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
+    tool_name: Mapped[str] = mapped_column(String(100))
+    tool_arguments: Mapped[dict] = mapped_column(JSON, default=dict)
+    description: Mapped[str] = mapped_column(Text)
+    affected_count: Mapped[int] = mapped_column(Integer, default=0)
+    status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
+    resolved_at: Mapped[str | None] = mapped_column(String)

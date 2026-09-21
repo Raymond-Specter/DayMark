@@ -2,6 +2,20 @@
 
 后端默认 `http://127.0.0.1:8000`；浏览器通过前端同源 `/api` 访问。实时、准确的字段定义以运行时 `/docs` 和 `/openapi.json` 为准。除 `/health` 外，下表路径均以 `/api` 开头。
 
+## AI Agent
+
+| 方法 | 路径 | 用途 |
+| --- | --- | --- |
+| GET | /ai/health | Ollama、模型、Agent 和设置状态 |
+| GET / POST | /ai/conversations | 会话列表 / 创建 |
+| GET / DELETE | /ai/conversations/{id} | 历史 / 删除会话 |
+| POST | /ai/chat | 流式或非流式 Agent 对话 |
+| POST | /ai/conversations/{id}/stop | 停止当前生成 |
+| GET | /ai/conversations/{id}/actions | 最近 Agent 写操作日志 |
+| POST | /ai/confirm/{action_id} | 执行或取消服务端保存的待确认动作 |
+
+SSE 事件为 `start`、`delta`、`reset`、`tool_status`、`tool_result`、`done`、`error`。工具结果和最终事件包含 `affected_entities`；需确认时包含保存动作的 `confirmation`。Tool 参数经过独立 Schema 验证，模型不能传 SQL 或绕过 Service Layer。
+
 ## 基本约定
 
 - JSON 请求/响应，UUID 资源 ID。创建/完整修改使用后端 Schema 验证，未知字段拒绝。
@@ -106,4 +120,4 @@ Task 列表 start / end 均包含边界，可按 status / project_id 筛选。�
 
 ## 未来接口边界
 
-Google Calendar、OpenAI 和 AI 规划在能力列表中保持未连接；不提供伪装成成功的占位调用。外部推送和日历同步未来通过独立 provider 实现，不改变基础 Task 管理契约。
+Google Calendar、OpenAI 和 AI 自动规划仍未连接；本地 AI 聊天接口已经启用，见 [AI API 与使用说明](ai_usage.md)。外部推送和日历同步未来通过独立 provider 实现，不改变基础 Task 管理契约。

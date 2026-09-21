@@ -1,0 +1,134 @@
+import json
+from pathlib import Path
+
+from sqlalchemy import select
+
+from ..models import AgentActionLog
+from ..services.common import local_now, settings
+from ..services.llm.base import LLMError, Message
+from .schemas import AgentOutcome
+
+PROMPT = (Path(__file__).resolve().parents[1] / "prompts/agent_system_prompt.txt").read_text(encoding="utf-8")
+
+
+class AgentService:
+    def __init__(self, llm, registry, executor, session_factory, max_steps=8):
+        self.llm, self.registry, self.executor = llm, registry, executor
+        self.session_factory, self.max_steps = session_factory, max_steps
+
+    def system_prompt(self, db):
+        current = local_now(db)
+        return PROMPT.format(current_datetime=current.strftime("%Y-%m-%d %H:%M:%S"),
+                             timezone=settings(db).timezone)
+
+    def system_prompt_for_conversation(self, db, conversation_id):
+        prompt = self.system_prompt(db)
+        logs = list(db.scalars(select(AgentActionLog).where(
+            AgentActionLog.conversation_id == conversation_id,
+            AgentActionLog.status == "success",
+        ).order_by(AgentActionLog.created_at.desc()).limit(8)))
+        if logs:
+            references = []
+            for log in logs:
+                state = log.after_state or {}
+                references.append({"tool": log.tool_name, "id": state.get("id"),
+                                   "title": state.get("title") or state.get("name"),
+                                   "date": state.get("date"), "start_time": state.get("start_time")})
+            prompt += "\n\n当前会话最近成功操作的实体引用（只能用于定位，真实当前状态仍应查询 Tool）：\n" + json.dumps(references, ensure_ascii=False)
+        return prompt
+
+    async def run(self, conversation_id, messages, options, emit):
+        affected, confirmation, metrics = [], None, {}
+        working = list(messages)
+        user_text = next((message.content for message in reversed(working) if message.role == "user"), "")
+        requires_tool = self._requires_tool(user_text)
+        # Completed prose from earlier turns can teach a small local model to
+        # imitate an answer instead of invoking a tool. Action context is kept
+        # in the system prompt as verified entity references, so tool-bound
+        # turns only need the system prompt and the current user request.
+        if requires_tool:
+            working = [working[0], working[-1]]
+        used_tools = False
+        available_tools = self._tool_schemas(user_text)
+        for _ in range(self.max_steps):
+            content, calls = "", []
+            stream = self.llm.stream_chat(working, options, available_tools)
+            try:
+                async for chunk in stream:
+                    metrics.update(chunk.metrics)
+                    calls.extend(chunk.tool_calls)
+                    if chunk.content:
+                        content += chunk.content
+                        await emit({"event": "delta", "content": chunk.content})
+            finally:
+                await stream.aclose()
+            if not calls:
+                if requires_tool and not used_tools:
+                    if content:
+                        await emit({"event": "reset"})
+                    working[0] = Message("system", working[0].content +
+                        "\n当前请求涉及真实规划数据或操作，上一响应没有调用工具，不能作为最终回答。必须立即调用合适的已注册工具；如果信息不足，明确询问用户，绝不能声称已执行。")
+                    continue
+                if not content.strip():
+                    raise LLMError("empty_answer", "模型未返回最终回答，请重试。", 502)
+                return AgentOutcome(content=content, metrics=metrics,
+                                    affected_entities=self._unique(affected), confirmation=confirmation)
+            if content:
+                await emit({"event": "reset"})
+            used_tools = True
+            working.append(Message("assistant", content, tool_calls=calls))
+            for call in calls:
+                function = call.get("function", {})
+                name, arguments = function.get("name", ""), function.get("arguments", {})
+                definition = self.registry.definitions.get(name)
+                status = definition.status_text if definition else "正在处理操作…"
+                await emit({"event": "tool_status", "tool": name, "message": status})
+                result = self.executor.execute(conversation_id, name, arguments)
+                affected.extend(result.affected_entities)
+                confirmation = result.confirmation or confirmation
+                await emit({"event": "tool_result", "tool": name, "success": result.success,
+                            "message": result.message, "affected_entities": result.affected_entities,
+                            "confirmation": result.confirmation})
+                call_id = call.get("id") or f"{name}-{len(working)}"
+                working.append(Message("tool", result.model_dump_json(), tool_call_id=call_id))
+        raise LLMError("tool_loop_limit", "工具调用次数过多，已停止且保留已经成功完成的操作。", 409)
+
+    @staticmethod
+    def _requires_tool(text):
+        markers = ("安排", "创建", "改到", "改期", "重新安排", "完成", "取消", "撤销", "删除", "暂停",
+                   "有哪些任务", "什么任务", "查看任务", "查询任务", "空闲时间", "日历", "截止", "重复任务")
+        return any(marker in text for marker in markers)
+
+    def _tool_schemas(self, text):
+        names = {"get_tasks", "get_calendar", "get_free_slots"}
+        if "撤销" in text:
+            names = {"undo_last_action"}
+        elif "完成" in text:
+            names = {"get_today_tasks", "complete_task"}
+        elif "删除" in text:
+            names = {"get_tasks", "delete_task"}
+        elif "取消" in text:
+            names = {"get_tasks", "cancel_task"}
+        elif "重新安排" in text and ("有事" in text or "冲突" in text):
+            names = {"get_calendar", "replan_day"}
+        elif any(marker in text for marker in ("改到", "改期", "重新安排")):
+            names = {"get_tasks", "reschedule_task", "update_task"}
+        elif "重复" in text or "Routine" in text or "routine" in text:
+            names = {"get_routines", "create_routine", "update_routine", "pause_routine"}
+        elif any(marker in text for marker in ("安排", "创建", "找个时间")):
+            names = {"get_free_slots", "create_task", "schedule_task"}
+        elif "今天" in text and "任务" in text:
+            names = {"get_today_tasks"}
+        if "截止" in text:
+            names = {"get_upcoming_deadlines"}
+        return [self.registry.definitions[name].provider_schema() for name in names if name in self.registry.definitions]
+
+    @staticmethod
+    def _unique(rows):
+        seen, result = set(), []
+        for row in rows:
+            key = (row.get("type"), row.get("id"))
+            if key not in seen:
+                seen.add(key)
+                result.append(row)
+        return result

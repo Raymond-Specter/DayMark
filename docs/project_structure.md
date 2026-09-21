@@ -21,6 +21,7 @@ Personal Planning System/
 │   ├── migrations/           # Alembic 迁移
 │   ├── app/
 │   │   ├── main.py           # API 和应用生命周期
+│   │   ├── agent/            # Agent Loop、工具注册/执行、权限与确定性调度
 │   │   ├── database.py       # SQLite、会话和外键配置
 │   │   ├── models.py         # 数据实体
 │   │   ├── schemas.py        # 输入验证和 API 类型
@@ -44,4 +45,4 @@ Personal Planning System/
 
 业务规则归后端服务；前端只提交用户意图并展示 API 数据。迁移、测试、文档与代码一同维护，运行数据、依赖缓存和构建产物不进入版本控制。
 
-本目录图强调职责边界；文件进一步拆分时保持这些边界，不为尚未实现的 AI 或考试模块预建空框架。
+本目录图强调职责边界；文件进一步拆分时保持这些边界。AI Agent 目录详见 [AI 架构](ai_architecture.md)：`app/agent/`、`app/api/ai.py`、`app/services/llm/`、`app/services/conversation.py`、`app/prompts/`、`frontend/components/assistant/` 和 `scripts/`。模型与运行程序分别放在 Git 忽略的 `models/` 与 `runtime/`。
