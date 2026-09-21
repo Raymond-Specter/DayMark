@@ -66,6 +66,8 @@ class AgentService:
                 await stream.aclose()
             if not calls:
                 if requires_tool and not used_tools:
+                    if self._is_clarification(content):
+                        return AgentOutcome(content=content, metrics=metrics)
                     if content:
                         await emit({"event": "reset"})
                     working[0] = Message("system", working[0].content +
@@ -106,7 +108,7 @@ class AgentService:
 
     @staticmethod
     def _requires_tool(text):
-        markers = ("安排", "创建", "添加", "新增", "加入", "加到", "加上去", "记到", "放到",
+        markers = ("安排", "创建", "添加", "新增", "导入", "加入", "加到", "加上去", "记到", "放到",
                    "改到", "改期", "重新安排", "完成", "取消", "撤销", "删除", "暂停",
                    "有哪些任务", "什么任务", "查看任务", "查询任务", "空闲时间", "日历", "截止", "重复任务")
         return any(marker in text for marker in markers)
@@ -125,6 +127,9 @@ class AgentService:
             names = {"get_calendar", "replan_day"}
         elif any(marker in text for marker in ("改到", "改期", "重新安排")):
             names = {"get_tasks", "reschedule_task", "update_task"}
+        elif (("课表" in text or "课程表" in text or ("[附件：" in text and ".pdf]" in text.lower()))
+              and any(marker in text for marker in ("安排", "创建", "添加", "新增", "导入", "加入", "加到", "加上去", "记到", "放到"))):
+            names = {"import_timetable"}
         elif "重复" in text or "Routine" in text or "routine" in text:
             names = {"get_routines", "create_routine", "update_routine", "pause_routine"}
         elif any(marker in text for marker in ("安排", "创建", "添加", "新增", "加入", "加到", "加上去", "记到", "放到", "找个时间")):
@@ -134,6 +139,12 @@ class AgentService:
         if "截止" in text:
             names = {"get_upcoming_deadlines"}
         return [self.registry.definitions[name].provider_schema() for name in names if name in self.registry.definitions]
+
+    @staticmethod
+    def _is_clarification(content):
+        text = content.strip()
+        return bool(text) and ("？" in text or "?" in text or any(
+            marker in text for marker in ("请提供", "请告诉", "请确认", "需要知道", "缺少", "无法确定")))
 
     @staticmethod
     def _normalize_tool_arguments(name, arguments, user_text):

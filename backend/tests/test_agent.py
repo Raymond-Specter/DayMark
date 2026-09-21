@@ -212,3 +212,47 @@ def test_late_task_without_duration_is_created_before_midnight(session_factory):
             task = db.scalar(select(Task).where(Task.title == "学习cs336"))
             assert task and (task.start_time, task.end_time, task.estimated_duration) == ("23:45", "23:59", 14)
     asyncio.run(run())
+
+
+def test_timetable_routes_to_batch_import_and_allows_date_clarification(session_factory):
+    async def run():
+        registry, tool_executor = executor(session_factory)
+        agent = AgentService(LLMService(ScriptedProvider([
+            ChatChunk(content="课表里没有学期日期，请提供开始和结束日期？", done=True),
+        ])), registry, tool_executor, session_factory)
+        schemas = agent._tool_schemas("把[附件：schedule.pdf]里的课表导入日历")
+        assert {item["function"]["name"] for item in schemas} == {"import_timetable"}
+        with session_factory() as db:
+            conversation = Conversation(); db.add(conversation); db.commit()
+        outcome = await agent.run(
+            conversation.id,
+            [Message("system", "test"), Message("user", "把附件课表导入日历")],
+            GenerationOptions(), lambda event: asyncio.sleep(0))
+        assert "请提供开始和结束日期" in outcome.content
+    asyncio.run(run())
+
+
+def test_timetable_import_requires_confirmation_and_creates_weekly_routines(session_factory):
+    _, tools = executor(session_factory)
+    with session_factory() as db:
+        conversation = Conversation(); db.add(conversation); db.commit(); key = conversation.id
+    arguments = {
+        "start_date": "2026-09-22", "end_date": "2026-12-15",
+        "courses": [
+            {"name": "Operating Systems", "weekdays": ["monday"], "start_time": "09:00", "end_time": "10:15", "location": "C101"},
+            {"name": "Machine Learning", "weekdays": ["wednesday", "friday"], "start_time": "14:00", "end_time": "15:30"},
+        ],
+    }
+    pending = tools.execute(key, "import_timetable", arguments)
+    assert pending.error_code == "CONFIRMATION_REQUIRED"
+    assert pending.confirmation["affected_count"] == 2
+    assert "Operating Systems" in pending.confirmation["description"]
+    with session_factory() as db:
+        assert not list(db.scalars(select(Routine)))
+    result = tools.confirm(key, pending.confirmation["action_id"], True)
+    assert result.success and len(result.affected_entities) == 2
+    with session_factory() as db:
+        routines = list(db.scalars(select(Routine).order_by(Routine.name)))
+        assert [row.name for row in routines] == ["Machine Learning", "Operating Systems"]
+        assert routines[0].weekdays == [2, 4]
+        assert routines[1].description == "C101"

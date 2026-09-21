@@ -143,6 +143,31 @@ class PlanningTools:
         return self.ok(f"已创建重复任务“{row.name}”。", raw(row),
                        [{"type": "routine", "id": row.id}], None, raw(row))
 
+    def import_timetable(self, args):
+        weekday_numbers = {name: index for index, name in enumerate(
+            ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"))}
+        rows = []
+        for course in args.courses:
+            start = minutes(course.start_time)
+            end = minutes(course.end_time)
+            description = " · ".join(part for part in (course.location, course.notes) if part)
+            checked = RoutineIn(
+                name=course.name, description=description, frequency="weekdays", interval=1,
+                interval_unit="weeks", weekdays=[weekday_numbers[day] for day in course.weekdays], start_date=args.start_date,
+                end_date=args.end_date, preferred_time=course.start_time,
+                estimated_duration=end - start, priority=2, active=True,
+            )
+            row = Routine(**checked.model_dump(exclude={"version"}))
+            self.db.add(row)
+            rows.append(row)
+        self.db.flush()
+        SchedulerService(self.db).materialize()
+        data = [raw(row) for row in rows]
+        affected = [{"type": "routine", "id": row.id} for row in rows]
+        return self.ok(
+            f"已导入 {len(rows)} 门课程，生效范围为 {args.start_date} 至 {args.end_date}。",
+            data, affected, None, {"routines": data})
+
     def update_routine(self, args):
         row = require(self.db, Routine, args.routine_id)
         before = raw(row)

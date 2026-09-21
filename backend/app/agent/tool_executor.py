@@ -29,8 +29,10 @@ class ToolExecutor:
                               message="工具参数格式不正确，请使用要求的绝对日期、时间和字段。")
         with self.session_factory() as db:
             tools = PlanningTools(db, conversation_id)
-            affected_count = len(tools.replan_candidates(checked)) if name == "replan_day" else 1
+            affected_count = (len(tools.replan_candidates(checked)) if name == "replan_day"
+                              else len(checked.courses) if name == "import_timetable" else 1)
             needs_confirmation = (definition.permission == ToolPermission.DESTRUCTIVE
+                                  or name == "import_timetable"
                                   or (name == "replan_day" and affected_count > 3))
             if needs_confirmation and not allow_destructive:
                 pending = PendingAgentAction(
@@ -116,4 +118,11 @@ class ToolExecutor:
             return f"删除任务 {arguments.task_id}，任务及历史数据将从正常界面隐藏。"
         if name == "replan_day":
             return f"重新安排 {arguments.date} {arguments.blocked_start}–{arguments.blocked_end} 内的大批冲突任务。"
+        if name == "import_timetable":
+            weekday_labels = {name: "周" + label for name, label in zip(
+                ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"), "一二三四五六日")}
+            lines = [f"{course.name}（{','.join(weekday_labels[day] for day in course.weekdays)} {course.start_time}–{course.end_time}）"
+                     for course in arguments.courses]
+            return (f"导入 {arguments.start_date} 至 {arguments.end_date} 的 {len(lines)} 门课程："
+                    + "；".join(lines))
         return f"执行 {name}。"

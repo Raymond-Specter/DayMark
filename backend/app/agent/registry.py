@@ -1,6 +1,6 @@
 from .permissions import ToolPermission as P
 from .tool_arguments import (
-    CreateRoutineArgs, CreateTaskArgs, DeleteTaskArgs, EmptyArgs, GetCalendarArgs,
+    CreateRoutineArgs, CreateTaskArgs, DeleteTaskArgs, EmptyArgs, GetCalendarArgs, ImportTimetableArgs,
     GetFreeSlotsArgs, GetTasksArgs, ReplanDayArgs, RescheduleTaskArgs, RoutineIdArgs,
     ScheduleTaskArgs, TaskIdArgs, UpcomingArgs, UpdateRoutineArgs, UpdateTaskArgs,
 )
@@ -22,6 +22,7 @@ def build_registry():
         ("complete_task", "将指定任务标记为完成。", TaskIdArgs, P.WRITE, "正在完成任务…"),
         ("cancel_task", "取消指定任务但保留记录。", TaskIdArgs, P.WRITE, "正在取消任务…"),
         ("create_routine", "创建重复任务规则并生成计划实例。", CreateRoutineArgs, P.WRITE, "正在创建重复任务…"),
+        ("import_timetable", "把已经从附件课表中准确识别出的课程批量导入为每周重复任务。必须提供明确的学期开始和结束日期、课程名、星期英文名（monday 到 sunday）和上下课时间；执行前会让用户确认。", ImportTimetableArgs, P.WRITE, "正在准备课表导入预览…"),
         ("update_routine", "修改指定重复任务。", UpdateRoutineArgs, P.WRITE, "正在更新重复任务…"),
         ("pause_routine", "暂停指定重复任务。", RoutineIdArgs, P.WRITE, "正在暂停重复任务…"),
         ("schedule_task", "仅当用户没有给出明确开始时间、要求‘找个时间’时，在指定范围中寻找空闲时段并创建任务。明确时间必须用 create_task。", ScheduleTaskArgs, P.WRITE, "正在寻找时间并安排任务…"),

@@ -78,6 +78,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 
 聊天输入框支持上传最多 3 个、每个不超过 10 MB 的文本、Markdown、CSV、JSON、常见代码文件、DOCX 或 PDF。附件和提取文本只保存在本机，并会随对话一起删除；扫描版 PDF 不支持 OCR，PDF 文本读取需要电脑上可用的 `pdftotext`。
 
+上传包含学期起止日期、课程名称、星期和上下课时间的课表后，可以要求 AI“按照附件课表导入日历”。系统会先展示批量导入预览并等待确认，确认后将每门课保存为每周重复任务；课表缺少学期起止日期时会先询问，不会自行猜测。
+
 安装位置：`runtime/ollama/`；模型：`models/ollama/`；模型临时文件与身份文件：`.runtime/ollama-*`；日志：`logs/ollama.*.log`。以上均不会进入 Git。环境变量默认值可参考 `.env.example`，如需修改复制为根目录 `.env`，不要提交真实 `.env`。页面保存的模型设置优先于环境默认值，API 地址和超时修改后重启后端生效。
 
 `setup_ollama.ps1 -Install -Start -Pull -DirectNetwork` 可在代理失效而网络可直连时使用；只影响本次进程与它启动的 Ollama。已运行的 Ollama 仍使用启动时的网络设置。安装包校验 SHA256 后才解压。下载模型失败可以重跑以续传。

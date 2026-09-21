@@ -156,6 +156,52 @@ class CreateRoutineArgs(ToolArguments):
         return value
 
 
+class TimetableCourse(ToolArguments):
+    name: str = Field(min_length=1, max_length=200)
+    weekdays: list[Literal["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]] = Field(
+        min_length=1, max_length=7, description="上课星期，必须使用英文小写全称")
+    start_time: str = Field(description="上课时间 HH:MM")
+    end_time: str = Field(description="下课时间 HH:MM")
+    location: str = Field(default="", max_length=300)
+    notes: str = Field(default="", max_length=1000)
+
+    @field_validator("weekdays")
+    @classmethod
+    def valid_weekdays(cls, value):
+        order = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+        return sorted(set(value), key=order.index)
+
+    @field_validator("start_time", "end_time")
+    @classmethod
+    def valid_course_time(cls, value):
+        if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
+            raise ValueError("时间必须为 HH:MM")
+        return value
+
+    @model_validator(mode="after")
+    def valid_period(self):
+        if self.end_time <= self.start_time:
+            raise ValueError("下课时间必须晚于上课时间")
+        return self
+
+
+class ImportTimetableArgs(ToolArguments):
+    start_date: str = Field(description="学期或课表生效日期 YYYY-MM-DD")
+    end_date: str = Field(description="学期或课表结束日期 YYYY-MM-DD")
+    courses: list[TimetableCourse] = Field(min_length=1, max_length=40)
+
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def valid_timetable_date(cls, value):
+        return Date.fromisoformat(value).isoformat()
+
+    @model_validator(mode="after")
+    def valid_dates(self):
+        if self.end_date < self.start_date:
+            raise ValueError("结束日期不能早于开始日期")
+        return self
+
+
 class UpdateRoutineArgs(ToolArguments):
     routine_id: str
     name: str | None = Field(default=None, min_length=1, max_length=200)

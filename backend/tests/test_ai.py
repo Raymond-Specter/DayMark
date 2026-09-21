@@ -1,5 +1,7 @@
 import asyncio
+import io
 import json
+import zipfile
 
 import httpx
 import pytest
@@ -10,6 +12,7 @@ from app.ai_schemas import ChatIn
 from app.main import app
 from app.models import ChatAttachment, ChatMessage, Conversation
 from app.services import attachments as attachment_service
+from app.services.attachments import extract_text
 from app.services.conversation import ConversationService, build_context
 from app.services.llm.base import ChatChunk, GenerationOptions, LLMError, Message
 from app.services.llm.config import LLMConfig
@@ -107,6 +110,16 @@ def test_attachment_validation(client, ai, tmp_path, monkeypatch):
     assert unsupported.status_code == 415
     empty = client.post(f"/api/ai/conversations/{key}/attachments?filename=empty.txt", content=b"")
     assert empty.status_code == 422
+
+
+def test_docx_attachment_text_extraction():
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("word/document.xml", """<?xml version="1.0" encoding="UTF-8"?>
+        <w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+          <w:body><w:p><w:r><w:t>Monday 09:00 Algorithms</w:t></w:r></w:p></w:body>
+        </w:document>""")
+    assert extract_text("schedule.docx", buffer.getvalue()) == "Monday 09:00 Algorithms"
 
 
 def test_multiturn_system_once(client, ai):

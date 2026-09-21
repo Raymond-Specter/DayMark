@@ -1,3 +1,4 @@
+import io
 import shutil
 import subprocess
 import tempfile
@@ -66,7 +67,7 @@ def _extract_pdf(content: bytes):
         target = Path(directory) / "upload.txt"
         source.write_bytes(content)
         result = subprocess.run(
-            [command, "-f", "1", "-l", "100", "-enc", "UTF-8", str(source), str(target)],
+            [command, "-layout", "-f", "1", "-l", "100", "-enc", "UTF-8", str(source), str(target)],
             capture_output=True, timeout=30, check=False,
         )
         if result.returncode or not target.exists():
