@@ -78,7 +78,7 @@ def commit(db):
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
     settings(db)
-    return {"status": "ok", "service": "personal-planning", "schema": "0004"}
+    return {"status": "ok", "service": "personal-planning", "schema": "0005"}
 
 
 @app.get("/api/bootstrap")

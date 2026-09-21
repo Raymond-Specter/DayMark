@@ -288,6 +288,85 @@
 .ai-composer textarea::placeholder {
   color: #a4aec0;
 }
+.ai-pending-attachments,
+.ai-message-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ai-pending-attachments {
+  padding-bottom: 11px;
+  margin-bottom: 10px;
+  border-bottom: 1px solid #edf0f6;
+}
+.ai-pending-attachments > div,
+.ai-message-attachments a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1px solid #e3e6f1;
+  border-radius: 10px;
+  background: #f8f9fd;
+  color: #5f6c83;
+}
+.ai-pending-attachments > div {
+  width: min(270px, 100%);
+  padding: 8px 9px 8px 11px;
+}
+.ai-pending-attachments svg,
+.ai-message-attachments svg {
+  flex-shrink: 0;
+  color: #746cce;
+}
+.ai-pending-attachments span {
+  min-width: 0;
+  flex: 1;
+}
+.ai-pending-attachments strong,
+.ai-pending-attachments small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.ai-pending-attachments strong {
+  font-size: 11px;
+  font-weight: 600;
+}
+.ai-pending-attachments small {
+  margin-top: 2px;
+  color: #99a4b5;
+  font-size: 9px;
+}
+.ai-pending-attachments button {
+  display: grid;
+  place-items: center;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #8995a8;
+  cursor: pointer;
+}
+.ai-pending-attachments button:hover {
+  background: #ebeaf8;
+  color: #5f59bd;
+}
+.ai-message-attachments {
+  margin-bottom: 9px;
+}
+.ai-message-attachments a {
+  max-width: 280px;
+  padding: 8px 11px;
+  font-size: 11px;
+  text-decoration: none;
+}
+.ai-message-attachments a span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .ai-composer-footer {
   display: flex;
   align-items: center;
@@ -298,6 +377,39 @@
 .ai-composer-footer > span {
   color: #a2adbd;
   font-size: 10px;
+}
+.ai-composer-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: #a2adbd;
+  font-size: 10px;
+}
+.ai-composer-tools input {
+  display: none;
+}
+.ai-attach {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  padding: 0;
+  border: 1px solid #e4e6f0;
+  border-radius: 9px;
+  background: #fafbfe;
+  color: #7d88a0;
+  cursor: pointer;
+}
+.ai-attach:hover:not(:disabled) {
+  border-color: #b8b3eb;
+  color: #625bd0;
+  background: #f5f4ff;
+}
+.ai-attach:disabled {
+  opacity: 0.45;
+  cursor: default;
 }
 .ai-send {
   width: 33px;

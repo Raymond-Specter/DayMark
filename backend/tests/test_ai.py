@@ -8,7 +8,8 @@ from sqlalchemy import select
 from app.api.ai import get_service
 from app.ai_schemas import ChatIn
 from app.main import app
-from app.models import ChatMessage, Conversation
+from app.models import ChatAttachment, ChatMessage, Conversation
+from app.services import attachments as attachment_service
 from app.services.conversation import ConversationService, build_context
 from app.services.llm.base import ChatChunk, GenerationOptions, LLMError, Message
 from app.services.llm.config import LLMConfig
@@ -68,6 +69,44 @@ def test_stream_and_persistent_history(client, ai):
     assert detail["messages"][1]["status"] == "completed"
     assert detail["title"] == "你好"
     assert ai[1].active is None
+
+
+def test_upload_attachment_is_visible_and_in_model_context(client, ai, session_factory, tmp_path, monkeypatch):
+    monkeypatch.setattr(attachment_service, "UPLOAD_DIR", tmp_path / "uploads")
+    key = conversation(client)
+    uploaded = client.post(
+        f"/api/ai/conversations/{key}/attachments?filename=plan.md",
+        content="# Week plan\nFinish chapter 3",
+        headers={"Content-Type": "text/markdown"},
+    )
+    assert uploaded.status_code == 201
+    attachment = uploaded.json()
+    assert attachment["filename"] == "plan.md" and attachment["size_bytes"] > 0
+    result = client.post("/api/ai/chat", json={
+        "conversation_id": key, "message": "总结附件", "attachment_ids": [attachment["id"]], "stream": False,
+    })
+    assert result.json()["status"] == "completed"
+    assert "[附件：plan.md]" in ai[0].received[-1][-1].content
+    assert "Finish chapter 3" in ai[0].received[-1][-1].content
+    message = client.get(f"/api/ai/conversations/{key}").json()["messages"][0]
+    assert message["content"] == "总结附件"
+    assert message["attachments"][0]["id"] == attachment["id"]
+    assert client.get(f"/api/ai/attachments/{attachment['id']}").content.startswith(b"# Week plan")
+    assert client.delete(f"/api/ai/attachments/{attachment['id']}").status_code == 409
+    assert client.delete(f"/api/ai/conversations/{key}").status_code == 200
+    with session_factory() as db:
+        assert not list(db.scalars(select(ChatAttachment)))
+    assert not list((tmp_path / "uploads").glob("*"))
+
+
+def test_attachment_validation(client, ai, tmp_path, monkeypatch):
+    monkeypatch.setattr(attachment_service, "UPLOAD_DIR", tmp_path / "uploads")
+    key = conversation(client)
+    unsupported = client.post(
+        f"/api/ai/conversations/{key}/attachments?filename=archive.exe", content=b"binary")
+    assert unsupported.status_code == 415
+    empty = client.post(f"/api/ai/conversations/{key}/attachments?filename=empty.txt", content=b"")
+    assert empty.status_code == 422
 
 
 def test_multiturn_system_once(client, ai):

@@ -8,12 +8,15 @@ import {
   Cpu,
   LoaderCircle,
   MessageSquare,
+  FileText,
+  Paperclip,
   Plus,
   RefreshCw,
   Settings2,
   ShieldCheck,
   Square,
   Trash2,
+  X,
 } from "lucide-react";
 import {
   aiRequest,
@@ -21,6 +24,7 @@ import {
   type AIHealth,
   type AgentConfirmation,
   type ChatEvent,
+  type ChatAttachment,
   type ChatMessage,
   type Conversation,
   type ConversationDetail,
@@ -45,7 +49,10 @@ export default function Assistant({ changed }: { changed?: () => void }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [actionStatus, setActionStatus] = useState<string[]>([]);
   const [confirmation, setConfirmation] = useState<AgentConfirmation | null>(null);
+  const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
   const scroll = useRef<HTMLDivElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
   const deleteDialog = useRef<HTMLDialogElement>(null);
   const controller = useRef<AbortController | null>(null);
   const activeId = useRef<string | null>(null);
@@ -83,6 +90,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       );
       if (sequence !== requestId.current) return;
       setSelected(id);
+      setAttachments([]);
       activeId.current = id;
       setMessages(detail.messages);
       remember(id);
@@ -130,11 +138,13 @@ export default function Assistant({ changed }: { changed?: () => void }) {
     setActionStatus([]);
     setConfirmation(null);
     setInput("");
+    setAttachments([]);
     remember(null);
   }
   async function send() {
-    const text = input.trim();
-    if (!text || sending.current || loadingHistory) return;
+    const pendingAttachments = attachments;
+    const text = input.trim() || (pendingAttachments.length ? "请阅读并分析附件。" : "");
+    if (!text || sending.current || loadingHistory || uploading) return;
     sending.current = true;
     setBusy(true);
     setError("");
@@ -157,6 +167,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
         remember(id);
       }
       setInput("");
+      setAttachments([]);
       setMessages((old) => [
         ...old,
         {
@@ -164,6 +175,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           role: "user",
           content: text,
           status: "completed",
+          attachments: pendingAttachments,
         },
         {
           id: placeholder,
@@ -175,6 +187,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       await streamChat(
         id,
         text,
+        pendingAttachments.map((item) => item.id),
         controller.current.signal,
         (event: ChatEvent) => {
           if (event.event === "start") {
@@ -223,7 +236,10 @@ export default function Assistant({ changed }: { changed?: () => void }) {
         },
       );
     } catch (e) {
-      if (!accepted) setInput(text);
+      if (!accepted) {
+        setInput(text === "请阅读并分析附件。" ? "" : text);
+        setAttachments(pendingAttachments);
+      }
       if (!(e instanceof DOMException && e.name === "AbortError"))
         setError(
           e instanceof TypeError
@@ -248,6 +264,56 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       setStopping(false);
       void refreshList().catch((e) => setError(e.message));
       void refreshHealth();
+    }
+  }
+  async function ensureConversation() {
+    if (selected) return selected;
+    const conversation = await aiRequest<Conversation>("/conversations", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+    setSelected(conversation.id);
+    activeId.current = conversation.id;
+    remember(conversation.id);
+    await refreshList();
+    return conversation.id;
+  }
+  async function upload(file: File) {
+    if (attachments.length >= 3) {
+      setError("每条消息最多上传 3 个文件。");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("文件不能超过 10 MB。");
+      return;
+    }
+    setUploading(true);
+    setError("");
+    try {
+      const id = await ensureConversation();
+      const response = await fetch(
+        `/api/ai/conversations/${id}/attachments?filename=${encodeURIComponent(file.name)}`,
+        { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file },
+      );
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(typeof body.detail === "string" ? body.detail : `上传失败（${response.status}）`);
+      }
+      const attachment = (await response.json()) as ChatAttachment;
+      setAttachments((old) => [...old, attachment]);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setUploading(false);
+      if (fileInput.current) fileInput.current.value = "";
+    }
+  }
+  async function removeAttachment(attachment: ChatAttachment) {
+    try {
+      await aiRequest(`/attachments/${attachment.id}`, { method: "DELETE" });
+      setAttachments((old) => old.filter((item) => item.id !== attachment.id));
+    } catch (e) {
+      setError((e as Error).message);
     }
   }
   async function stop() {
@@ -457,6 +523,16 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                       <strong className="ai-message-author">
                         {m.role === "user" ? "你" : "AI Assistant"}
                       </strong>
+                      {m.attachments && m.attachments.length > 0 && (
+                        <div className="ai-message-attachments">
+                          {m.attachments.map((attachment) => (
+                            <a key={attachment.id} href={`/api/ai/attachments/${attachment.id}`}>
+                              <FileText size={15} />
+                              <span>{attachment.filename}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
                       {m.content ? (
                         <div className="ai-markdown">
                           <ReactMarkdown
@@ -546,6 +622,26 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                 void send();
               }}
             >
+              {attachments.length > 0 && (
+                <div className="ai-pending-attachments">
+                  {attachments.map((attachment) => (
+                    <div key={attachment.id}>
+                      <FileText size={16} />
+                      <span>
+                        <strong>{attachment.filename}</strong>
+                        <small>{Math.max(1, Math.round(attachment.size_bytes / 1024))} KB</small>
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`移除 ${attachment.filename}`}
+                        onClick={() => void removeAttachment(attachment)}
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <textarea
                 aria-label="给 AI 的消息"
                 placeholder="说说你的想法，或需要一起理清的安排…"
@@ -565,11 +661,34 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                 }}
               />
               <div className="ai-composer-footer">
-                <span>
-                  {busy
-                    ? "正在生成 · 仅展示最终回答"
-                    : "Enter 发送 · Shift + Enter 换行"}
-                </span>
+                <div className="ai-composer-tools">
+                  <input
+                    ref={fileInput}
+                    type="file"
+                    accept=".txt,.md,.markdown,.csv,.json,.html,.htm,.css,.js,.jsx,.ts,.tsx,.py,.java,.c,.cpp,.h,.sql,.yaml,.yml,.xml,.log,.pdf,.docx"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void upload(file);
+                    }}
+                  />
+                  <button
+                    type="button"
+                    className="ai-attach"
+                    title="上传文件"
+                    aria-label="上传文件"
+                    disabled={busy || loadingHistory || uploading || attachments.length >= 3}
+                    onClick={() => fileInput.current?.click()}
+                  >
+                    {uploading ? <LoaderCircle size={16} className="spin" /> : <Paperclip size={16} />}
+                  </button>
+                  <span>
+                    {uploading
+                      ? "正在读取文件…"
+                      : busy
+                        ? "正在生成 · 仅展示最终回答"
+                        : "上传文件 · Enter 发送"}
+                  </span>
+                </div>
                 {busy ? (
                   <button
                     type="button"
@@ -586,7 +705,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                     className="ai-send"
                     aria-label="发送消息"
                     disabled={
-                      !input.trim() || loadingHistory || Boolean(health?.busy)
+                      (!input.trim() && !attachments.length) || loadingHistory || uploading || Boolean(health?.busy)
                     }
                   >
                     <ArrowUp size={20} />

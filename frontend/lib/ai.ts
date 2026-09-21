@@ -28,6 +28,15 @@ export interface ChatMessage {
   model?: string;
   duration_ms?: number;
   error?: string | null;
+  attachments?: ChatAttachment[];
+}
+export interface ChatAttachment {
+  id: string;
+  filename: string;
+  media_type: string;
+  size_bytes: number;
+  message_id?: string | null;
+  created_at: string;
 }
 export interface ConversationDetail extends Conversation {
   messages: ChatMessage[];
@@ -90,6 +99,7 @@ export async function aiRequest<T>(
 export async function streamChat(
   conversation_id: string,
   message: string,
+  attachment_ids: string[],
   signal: AbortSignal,
   receive: (event: ChatEvent) => void,
 ) {
@@ -97,7 +107,7 @@ export async function streamChat(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal,
-    body: JSON.stringify({ conversation_id, message, stream: true }),
+    body: JSON.stringify({ conversation_id, message, attachment_ids, stream: true }),
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({}));

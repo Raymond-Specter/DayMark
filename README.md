@@ -76,6 +76,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 
 打开 [AI Assistant](http://127.0.0.1:3000/assistant)，可以用自然语言查询或操作 Task、Calendar 和 Routine。Agent 通过受控工具调用现有业务 Service，成功后页面自动刷新；明确时间会检查冲突，删除和大批量改期需要确认，最近的任务操作可以撤销。模型不能直接执行 SQL，也不会修改 Goal。Thinking 开启时仍不展示内部推理。
 
+聊天输入框支持上传最多 3 个、每个不超过 10 MB 的文本、Markdown、CSV、JSON、常见代码文件、DOCX 或 PDF。附件和提取文本只保存在本机，并会随对话一起删除；扫描版 PDF 不支持 OCR，PDF 文本读取需要电脑上可用的 `pdftotext`。
+
 安装位置：`runtime/ollama/`；模型：`models/ollama/`；模型临时文件与身份文件：`.runtime/ollama-*`；日志：`logs/ollama.*.log`。以上均不会进入 Git。环境变量默认值可参考 `.env.example`，如需修改复制为根目录 `.env`，不要提交真实 `.env`。页面保存的模型设置优先于环境默认值，API 地址和超时修改后重启后端生效。
 
 `setup_ollama.ps1 -Install -Start -Pull -DirectNetwork` 可在代理失效而网络可直连时使用；只影响本次进程与它启动的 Ollama。已运行的 Ollama 仍使用启动时的网络设置。安装包校验 SHA256 后才解压。下载模型失败可以重跑以续传。

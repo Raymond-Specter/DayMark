@@ -191,6 +191,17 @@ class ChatMessage(Record, Base):
     )
 
 
+class ChatAttachment(Record, Base):
+    __tablename__ = "chat_attachments"
+    conversation_id: Mapped[str] = mapped_column(ForeignKey("conversations.id", ondelete="CASCADE"), index=True)
+    message_id: Mapped[str | None] = mapped_column(ForeignKey("chat_messages.id", ondelete="CASCADE"), index=True)
+    filename: Mapped[str] = mapped_column(String(200))
+    media_type: Mapped[str] = mapped_column(String(200), default="application/octet-stream")
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    storage_name: Mapped[str] = mapped_column(String(100), unique=True)
+    extracted_text: Mapped[str] = mapped_column(Text)
+
+
 class AISettings(Base):
     __tablename__ = "ai_settings"
     id: Mapped[int] = mapped_column(Integer, primary_key=True, default=1)

@@ -10,7 +10,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import sessionmaker
 
 from ..ai_schemas import ModelSettings
-from ..models import AISettings, ChatMessage, Conversation, now_iso
+from ..models import AISettings, ChatAttachment, ChatMessage, Conversation, now_iso
 from .common import require
 from .llm.base import GenerationOptions, LLMError, Message
 from .llm.config import LLMConfig
@@ -31,11 +31,21 @@ def history(db, key):
     return list(db.scalars(select(ChatMessage).where(ChatMessage.conversation_id == key).order_by(ChatMessage.position)))
 
 
-def build_context(rows, message, options, system_prompt=SYSTEM_PROMPT):
+def _with_attachments(content, attachments):
+    if not attachments:
+        return content
+    sections = [content]
+    for attachment in attachments:
+        sections.append(f"[附件：{attachment.filename}]\n{attachment.extracted_text}")
+    return "\n\n".join(sections)
+
+
+def build_context(rows, message, options, system_prompt=SYSTEM_PROMPT, attachment_map=None, current_attachments=None):
     # A conservative UTF-8 budget preserves full recent exchanges and always the
     # current question/system prompt. It is a bound, not a model tokenizer.
     budget = (options.num_ctx - 1024) * 2
-    current = [Message("system", system_prompt), Message("user", message)]
+    attachment_map = attachment_map or {}
+    current = [Message("system", system_prompt), Message("user", _with_attachments(message, current_attachments or []))]
     used = sum(len(m.content.encode("utf-8")) + 64 for m in current)
     if used > budget:
         raise HTTPException(422, "消息超过当前上下文预算，请缩短消息或提高上下文长度。")
@@ -43,7 +53,8 @@ def build_context(rows, message, options, system_prompt=SYSTEM_PROMPT):
     for index in range(1, len(rows)):
         before, after = rows[index - 1], rows[index]
         if before.role == "user" and after.role == "assistant" and after.status == "completed":
-            pairs.append([Message("user", before.content), Message("assistant", after.content)])
+            pairs.append([Message("user", _with_attachments(before.content, attachment_map.get(before.id, []))),
+                          Message("assistant", after.content)])
     chosen = []
     for pair in reversed(pairs):
         size = sum(len(m.content.encode("utf-8")) + 64 for m in pair)
@@ -77,13 +88,23 @@ class ConversationService:
         settings = read_settings(db, self.config)
         options = GenerationOptions(**settings.model_dump(), timeout=self.config.timeout)
         rows = history(db, conversation.id)
+        attachments = list(db.scalars(select(ChatAttachment).where(ChatAttachment.conversation_id == conversation.id)))
+        attachment_map = {}
+        for attachment in attachments:
+            if attachment.message_id:
+                attachment_map.setdefault(attachment.message_id, []).append(attachment)
+        selected_attachments = [attachment for attachment in attachments if attachment.id in payload.attachment_ids]
+        if len(selected_attachments) != len(set(payload.attachment_ids)) or any(row.message_id for row in selected_attachments):
+            raise HTTPException(422, "附件不存在、已发送或不属于当前对话，请重新上传。")
         prompt = self.agent.system_prompt_for_conversation(db, conversation.id) if self.agent else SYSTEM_PROMPT
-        messages, truncated = build_context(rows, payload.message, options, prompt)
+        messages, truncated = build_context(rows, payload.message, options, prompt, attachment_map, selected_attachments)
         position = rows[-1].position + 1 if rows else 1
         user = ChatMessage(conversation_id=conversation.id, role="user", content=payload.message, position=position)
         assistant = ChatMessage(conversation_id=conversation.id, role="assistant", content="", status="generating", model=options.model, position=position + 1)
         db.add(user)
         db.flush()
+        for attachment in selected_attachments:
+            attachment.message_id = user.id
         db.add(assistant)
         if conversation.title == "新对话":
             conversation.title = payload.message[:60]

@@ -1,18 +1,20 @@
 from functools import lru_cache
 
-from fastapi import APIRouter, Depends, HTTPException
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..ai_schemas import ChatIn, ConfirmationIn, ConversationIn, ModelSettings
 from ..database import SessionLocal, get_db
-from ..models import AISettings, AgentActionLog, Conversation
+from ..models import AISettings, AgentActionLog, ChatAttachment, Conversation
 from ..agent.agent_service import AgentService
 from ..agent.registry import build_registry
 from ..agent.tool_executor import ToolExecutor
 from ..services.common import raw, require
 from ..services.conversation import ConversationService, history, read_settings
+from ..services.attachments import (MAX_FILE_BYTES, attachment_dict, attachment_path,
+                                    delete_upload, extract_text, safe_filename, save_upload)
 from ..services.llm.base import LLMError
 from ..services.llm.config import LLMConfig
 from ..services.llm.ollama_provider import OllamaProvider
@@ -88,9 +90,68 @@ def create_conversation(data: ConversationIn, db: Session = Depends(get_db)):
     return raw(row)
 
 
+def _message_dict(row, attachment_map):
+    return {**raw(row), "attachments": [attachment_dict(item) for item in attachment_map.get(row.id, [])]}
+
+
 @router.get("/conversations/{key}")
 def conversation(key: str, db: Session = Depends(get_db)):
-    return {**raw(require(db, Conversation, key)), "messages": [raw(row) for row in history(db, key)]}
+    conversation_row = require(db, Conversation, key)
+    attachments = list(db.scalars(select(ChatAttachment).where(ChatAttachment.conversation_id == key)))
+    attachment_map = {}
+    for attachment in attachments:
+        if attachment.message_id:
+            attachment_map.setdefault(attachment.message_id, []).append(attachment)
+    return {**raw(conversation_row), "messages": [_message_dict(row, attachment_map) for row in history(db, key)]}
+
+
+@router.post("/conversations/{key}/attachments", status_code=201)
+async def upload_attachment(key: str, request: Request, filename: str, db: Session = Depends(get_db)):
+    require(db, Conversation, key)
+    filename = safe_filename(filename)
+    content = bytearray()
+    async for chunk in request.stream():
+        content.extend(chunk)
+        if len(content) > MAX_FILE_BYTES:
+            raise HTTPException(413, "文件不能超过 10 MB。")
+    if not content:
+        raise HTTPException(422, "不能上传空文件。")
+    raw_content = bytes(content)
+    text = extract_text(filename, raw_content)
+    storage_name = save_upload(filename, raw_content)
+    row = ChatAttachment(
+        conversation_id=key, filename=filename,
+        media_type=(request.headers.get("content-type") or "application/octet-stream")[:200],
+        size_bytes=len(raw_content), storage_name=storage_name, extracted_text=text,
+    )
+    try:
+        db.add(row)
+        db.commit()
+    except Exception:
+        delete_upload(storage_name)
+        raise
+    return attachment_dict(row)
+
+
+@router.get("/attachments/{attachment_id}")
+def download_attachment(attachment_id: str, db: Session = Depends(get_db)):
+    row = require(db, ChatAttachment, attachment_id)
+    path = attachment_path(row.storage_name)
+    if not path.is_file():
+        raise HTTPException(404, "附件文件不存在。")
+    return FileResponse(path, media_type=row.media_type, filename=row.filename)
+
+
+@router.delete("/attachments/{attachment_id}")
+def remove_attachment(attachment_id: str, db: Session = Depends(get_db)):
+    row = require(db, ChatAttachment, attachment_id)
+    if row.message_id:
+        raise HTTPException(409, "已经发送的附件不能从消息中单独删除。")
+    storage_name = row.storage_name
+    db.delete(row)
+    db.commit()
+    delete_upload(storage_name)
+    return {"deleted": True}
 
 
 @router.delete("/conversations/{key}")
@@ -98,8 +159,12 @@ async def delete_conversation(key: str, db: Session = Depends(get_db), service=D
     if service.active and service.active.conversation_id == key:
         raise HTTPException(409, "请先停止生成再删除会话。")
     row = require(db, Conversation, key)
+    uploads = [attachment.storage_name for attachment in db.scalars(
+        select(ChatAttachment).where(ChatAttachment.conversation_id == key))]
     db.delete(row)
     db.commit()
+    for storage_name in uploads:
+        delete_upload(storage_name)
     return {"deleted": True}
 
 
