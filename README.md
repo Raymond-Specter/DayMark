@@ -76,7 +76,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 
 打开 [AI Assistant](http://127.0.0.1:3000/assistant)，可以用自然语言查询或操作 Task、Calendar 和 Routine。Agent 通过受控工具调用现有业务 Service，成功后页面自动刷新；明确时间会检查冲突，删除和大批量改期需要确认，最近的任务操作可以撤销。模型不能直接执行 SQL，也不会修改 Goal。Thinking 开启时仍不展示内部推理。
 
-聊天输入框支持上传最多 3 个、每个不超过 10 MB 的文本、Markdown、CSV、JSON、常见代码文件、DOCX 或 PDF。附件和提取文本只保存在本机，并会随对话一起删除；扫描版 PDF 不支持 OCR，PDF 文本读取需要电脑上可用的 `pdftotext`。
+聊天输入框支持上传最多 3 个、每个不超过 10 MB 的文本、Markdown、CSV、JSON、常见代码文件、DOCX 或 PDF。附件和提取文本只保存在本机，并会随对话一起删除。PDF 优先读取文字层；扫描版 PDF 会在本机转换为图片，再用 Tesseract 的中英文模型进行 OCR。首次启用或更换电脑时运行 `.\scripts\setup_ocr.ps1 -DirectNetwork` 准备项目内的 OCR 模型；电脑还需安装 Tesseract OCR 和提供 `pdftoppm`（MiKTeX/Poppler）。
 
 上传包含学期起止日期、课程名称、星期和上下课时间的课表后，可以要求 AI“按照附件课表导入日历”。系统会先展示批量导入预览并等待确认，确认后将每门课保存为每周重复任务；课表缺少学期起止日期时会先询问，不会自行猜测。
 

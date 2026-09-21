@@ -122,6 +122,12 @@ def test_docx_attachment_text_extraction():
     assert extract_text("schedule.docx", buffer.getvalue()) == "Monday 09:00 Algorithms"
 
 
+def test_scanned_pdf_falls_back_to_local_ocr(monkeypatch):
+    monkeypatch.setattr(attachment_service, "_find_command", lambda *_: None)
+    monkeypatch.setattr(attachment_service, "_ocr_pdf", lambda *_: "OCR schedule Monday 09:00")
+    assert attachment_service._extract_pdf(b"scanned-pdf") == "OCR schedule Monday 09:00"
+
+
 def test_multiturn_system_once(client, ai):
     key = conversation(client)
     for text in ["今晚学托福", "明早有考试"]:
