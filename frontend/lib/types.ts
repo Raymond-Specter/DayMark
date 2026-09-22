@@ -48,6 +48,7 @@ export interface Task {
   offset_days: number;
   reminder: number | null;
   version: number;
+  track_learning: boolean;
   blocked: boolean;
   blocked_reason: string | null;
   dependency_title: string | null;
@@ -172,6 +173,44 @@ export interface Review {
   completed_tasks: { id: string; title: string }[];
   unfinished_tasks: { id: string; title: string }[];
   saved: boolean;
+}
+export interface KnowledgeDocument {
+  id: string;
+  title: string;
+  original_filename: string | null;
+  file_type: string;
+  mime_type: string;
+  file_size: number;
+  project_id: string | null;
+  knowledge_date: string;
+  upload_date: string;
+  document_type: string;
+  is_output: boolean;
+  processing_status: "stored" | "parsing" | "ready" | "failed";
+  extraction_error: string | null;
+  description: string;
+  version: number;
+  download_url: string | null;
+  learning_entry_ids: string[];
+}
+export interface LearningEntry {
+  id: string;
+  date: string;
+  project_id: string | null;
+  task_id: string | null;
+  title: string;
+  entry_type: string;
+  description: string;
+  duration_minutes: number;
+  progress: number | null;
+  status: string;
+  reflection: string;
+  problems: string;
+  next_action: string;
+  tags: string[];
+  concepts: string[];
+  version: number;
+  documents: KnowledgeDocument[];
 }
 export interface CalendarEventRecord {
   id: string;

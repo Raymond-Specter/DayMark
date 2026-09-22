@@ -1,6 +1,6 @@
 # Personal Learning Archive + Knowledge Base 设计
 
-状态：架构评审稿，不包含 Phase 1 业务实现。
+状态：架构已确认；Phase 1 已实现 LearningEntry、KnowledgeDocument、长期文件存储、基础文本解析、关联关系及两个主导航页面。Day Detail、任务完成联动、AI 分析、FTS 与 RAG 留待后续阶段。
 
 ## 1. 当前项目审计
 

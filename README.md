@@ -36,6 +36,8 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 4. 在 Today 查看时间顺序、今日完成情况、临近截止事项及昨日遗留；在日历中拖动任务调整日期与时间。
 5. 完成任务后勾选完成；在每日回顾中记录实际分钟数、精力和笔记。实际时间不会由预计时长自动推断。
 6. 在进度与统计中查看目标、项目、里程碑和任务完成比例，以及计划与实际投入。
+7. 在学习档案中记录实际投入、进展、反思和下一步；这类事实记录独立于计划任务。
+8. 在知识库中上传笔记、课件、代码、PDF 或 DOCX，按知识日期、Project 和文档类型归档。文件和解析文本只保存在本机，不会自动发送给 AI。
 
 任务优先级 `1 / 2 / 3` 分别表示高 / 中 / 低。周视图和本周统计以周一开始。未完成事项不会被自动删除或自动安排到今天；延期、取消、保持逾期均由你决定。
 
@@ -123,5 +125,6 @@ npm.cmd run dev
 - [本地 AI 使用与开发说明](docs/ai_usage.md)
 - [本地 AI 文件变更清单](docs/ai_changes.md)
 - [本地 AI 验收记录](docs/ai_verification.md)
+- [学习档案与知识库设计](docs/learning_knowledge_design.md)
 
 实现采用 Next.js、React、FullCalendar、FastAPI、SQLAlchemy、Alembic 和 SQLite。设计参考：[Next.js 官方安装文档](https://nextjs.org/docs/app/getting-started/installation)、[FullCalendar React 接入](https://fullcalendar.io/docs/v6/react)、[拖动与缩放](https://fullcalendar.io/docs/v6/event-dragging-resizing)、[FastAPI 生命周期](https://fastapi.tiangolo.com/advanced/events/)、[SQLAlchemy 2.0](https://docs.sqlalchemy.org/en/20/)。

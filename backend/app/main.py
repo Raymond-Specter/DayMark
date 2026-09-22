@@ -10,7 +10,8 @@ from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
 from .database import SessionLocal, get_db
-from .models import CalendarEvent, DailyReview, Goal, Milestone, Notification, Project, Routine, Task, TaskHistory, now_iso
+from .models import (CalendarEvent, DailyReview, Goal, KnowledgeDocument, LearningEntry,
+                     Milestone, Notification, Project, Routine, Task, TaskHistory, now_iso)
 from .schemas import EventIn, GoalIn, MilestoneIn, ProjectIn, ReviewIn, RoutineIn, SettingsIn, TaskAction, TaskIn
 from .services.calendar import CalendarService
 from .services.common import live_tasks, raw, require, settings, sorted_tasks, task_dict, today
@@ -19,6 +20,7 @@ from .services.reminder import ReminderService
 from .services.scheduler import SchedulerService
 from .services.statistics import StatisticsService
 from .api.ai import router as ai_router, service_instance as get_ai_service
+from .api.learning import router as learning_router
 from .models import ChatMessage
 
 
@@ -40,6 +42,7 @@ async def lifespan(app):
 
 app = FastAPI(title="Personal Planning System", version="1.0.0", lifespan=lifespan)
 app.include_router(ai_router)
+app.include_router(learning_router)
 
 
 @app.middleware("http")
@@ -78,7 +81,7 @@ def commit(db):
 @app.get("/health")
 def health(db: Session = Depends(get_db)):
     settings(db)
-    return {"status": "ok", "service": "personal-planning", "schema": "0005"}
+    return {"status": "ok", "service": "personal-planning", "schema": "0007"}
 
 
 @app.get("/api/bootstrap")
@@ -158,7 +161,8 @@ def update_project(key: str, data: ProjectIn, db: Session = Depends(get_db)):
 @app.delete("/api/projects/{key}")
 def delete_project(key: str, db: Session = Depends(get_db)):
     row = require(db, Project, key)
-    children = any(db.scalar(select(model).where(model.project_id == key)) for model in (Milestone, Task, Routine))
+    children = any(db.scalar(select(model).where(model.project_id == key))
+                   for model in (Milestone, Task, Routine, LearningEntry, KnowledgeDocument))
     allocated = any(key in r.project_minutes for r in db.scalars(select(DailyReview)))
     if children or allocated:
         raise HTTPException(409, "项目有关联任务、阶段或时间记录，请将项目归档以保留记录")

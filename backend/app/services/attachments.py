@@ -18,7 +18,7 @@ OCR_MODEL_DIR = ROOT / "models" / "tesseract"
 TEXT_EXTENSIONS = {
     ".txt", ".md", ".markdown", ".csv", ".json", ".html", ".htm", ".css",
     ".js", ".jsx", ".ts", ".tsx", ".py", ".java", ".c", ".cpp", ".h",
-    ".sql", ".yaml", ".yml", ".xml", ".log",
+    ".sql", ".yaml", ".yml", ".xml", ".log", ".ipynb",
 }
 SUPPORTED_EXTENSIONS = TEXT_EXTENSIONS | {".pdf", ".docx"}
 
@@ -28,7 +28,7 @@ def safe_filename(value: str | None):
     return name[:200] or "file"
 
 
-def extract_text(filename: str, content: bytes):
+def extract_text(filename: str, content: bytes, max_chars=MAX_EXTRACTED_CHARS):
     extension = Path(filename).suffix.lower()
     if extension not in SUPPORTED_EXTENSIONS:
         raise HTTPException(415, "暂不支持这种文件。可上传 TXT、Markdown、CSV、JSON、代码、PDF 或 DOCX。")
@@ -48,7 +48,7 @@ def extract_text(filename: str, content: bytes):
     text = text.replace("\x00", "").strip()
     if not text:
         raise HTTPException(422, "文件中没有可读取的文字；扫描版 PDF 暂不支持 OCR。")
-    return text[:MAX_EXTRACTED_CHARS]
+    return text[:max_chars]
 
 
 def _decode_text(content: bytes):

@@ -72,6 +72,7 @@ class TaskIn(Input):
     priority: int = Field(default=2, ge=1, le=3)
     depends_on_task_id: str | None = None
     reminder: Literal[0, 10, 30, 60, 1440] | None = None
+    track_learning: bool = False
     version: int | None = None
 
     @field_validator("deadline")

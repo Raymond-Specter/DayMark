@@ -42,6 +42,7 @@ export function taskPayload(task: Task) {
     priority,
     depends_on_task_id,
     reminder,
+    track_learning,
     version,
   } = task;
   return {
@@ -57,6 +58,7 @@ export function taskPayload(task: Task) {
     priority,
     depends_on_task_id,
     reminder,
+    track_learning,
     version,
   };
 }

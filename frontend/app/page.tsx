@@ -17,6 +17,7 @@ import {
   Flag,
   LayoutGrid,
   Leaf,
+  LibraryBig,
   ListTodo,
   LoaderCircle,
   Menu,
@@ -26,6 +27,7 @@ import {
   Search,
   Settings,
   Sparkles,
+  BookOpenCheck,
   Sun,
   Target,
   X,
@@ -56,6 +58,12 @@ const CalendarView = dynamic(() => import("@/components/CalendarView"), {
   ssr: false,
   loading: () => <div className="panel loading-panel">正在加载日历…</div>,
 });
+const LearningArchive = dynamic(() => import("@/components/LearningArchive"), {
+  ssr: false,
+});
+const KnowledgeBase = dynamic(() => import("@/components/KnowledgeBase"), {
+  ssr: false,
+});
 
 type Page =
   | "today"
@@ -63,6 +71,8 @@ type Page =
   | "tasks"
   | "goals"
   | "routines"
+  | "learning"
+  | "knowledge"
   | "review"
   | "dashboard"
   | "assistant"
@@ -108,6 +118,20 @@ const pages: {
     english: "Routines",
     subtitle: "让持续的投入，慢慢成为习惯。",
     icon: Repeat2,
+  },
+  {
+    id: "learning",
+    title: "学习档案",
+    english: "Learning Archive",
+    subtitle: "记录每天学了什么，把投入、进展与下一步串起来。",
+    icon: BookOpenCheck,
+  },
+  {
+    id: "knowledge",
+    title: "知识库",
+    english: "Knowledge Base",
+    subtitle: "按日期和项目归档资料，让学习产出长期可找。",
+    icon: LibraryBig,
   },
   {
     id: "review",
@@ -579,7 +603,14 @@ export default function Home() {
               </div>
               <p>{currentPage.subtitle}</p>
             </div>
-            {!["review", "dashboard", "settings", "assistant"].includes(
+            {![
+              "review",
+              "dashboard",
+              "settings",
+              "assistant",
+              "learning",
+              "knowledge",
+            ].includes(
               page,
             ) && (
               <button
@@ -1129,6 +1160,20 @@ export default function Home() {
                     </div>
                   )}
                 </>
+              )}
+              {page === "learning" && (
+                <LearningArchive
+                  projects={data.projects}
+                  today={data.today}
+                  notify={notify}
+                />
+              )}
+              {page === "knowledge" && (
+                <KnowledgeBase
+                  projects={data.projects}
+                  today={data.today}
+                  notify={notify}
+                />
               )}
               {page === "review" && (
                 <DailyReview data={data} changed={refresh} notify={notify} />
