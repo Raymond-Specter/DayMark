@@ -20,7 +20,7 @@ Agent Loop 最多执行 8 步。模型返回 tool call 后，执行器调用注�
 - `backend/app/agent/agent_service.py`：循环、当前时间、会话实体引用、按意图缩小工具集合、防止假执行。
 - `backend/app/agent/tool_registry.py` 与 `registry.py`：统一 JSON Schema、权限和用户可见状态文案。
 - `backend/app/agent/tool_executor.py`：参数验证、权限、确认、调用日志和异常净化。
-- `backend/app/agent/tools.py`：Task / Calendar / Routine / Planner 工具适配，只调用既有业务服务。
+- `backend/app/agent/tools.py` 与 `workspace_tools.py`：覆盖页面可人工操作的数据，复用既有 Schema、Service 和业务校验。
 - `backend/app/agent/planner_service.py`：冲突检测、空闲时段合并和 first-fit 调度。
 - `backend/app/prompts/agent_system_prompt.txt`：执行型 Agent 规则。
 - `backend/app/services/conversation.py`：聊天历史、SSE、Agent 调用、停止与持久化。
@@ -31,11 +31,11 @@ Agent Loop 最多执行 8 步。模型返回 tool call 后，执行器调用注�
 
 ## 工具与权限
 
-READ 自动执行：`get_today_tasks`、`get_tasks`、`get_calendar`、`get_free_slots`、`get_routines`、`get_upcoming_deadlines`。
+READ 查询自动执行，覆盖 Task、Calendar、Routine、Goal、Project、Milestone、学习档案、知识库、每日复盘、统计、设置和通知。
 
-WRITE 自动执行并写 `AgentActionLog`：`create_task`、`update_task`、`reschedule_task`、`complete_task`、`cancel_task`、`create_routine`、`update_routine`、`pause_routine`、`schedule_task`、`replan_day`、`undo_last_action`。
+WRITE 创建与修改自动执行并写 `AgentActionLog`。每个工具复用页面对应的 Schema、关联校验和 Service；知识库工具只能复制当前对话已上传的附件，不能读取任意路径。完整工具名和行为以运行时加载的 [Agent 手册](../backend/app/prompts/agent_manual.md) 为准。
 
-DESTRUCTIVE 必须确认：`delete_task`。一次 `replan_day` 影响超过 3 个任务时也动态升级为需确认操作。后端把精确工具名和参数保存到 `PendingAgentAction`，确认接口执行保存的动作，不让模型重新生成参数。
+所有 `delete_*` 工具均为 DESTRUCTIVE，必须确认。课表导入始终确认；一次 `replan_day` 影响超过 3 个任务时也动态升级为需确认操作。后端把精确工具名和参数保存到 `PendingAgentAction`，确认接口执行保存的动作，不让模型重新生成参数。
 
 每个 Tool Result 统一返回 `success`、`message`、`data`、`affected_entities`，失败另含 `error_code`。Python 异常文本不会直接暴露给模型或页面。
 
@@ -61,4 +61,4 @@ Thinking 内容只存在于当前 Provider 调用的内存上下文。DeepSeek �
 
 迁移 `0002` / `0003` 保存会话、消息与模型设置；`0004` 新增 Agent 操作表；`0006` 增加 Provider 模式和请求级幂等元数据。模型、Ollama 程序、SQLite、日志与 `.env` 均不提交 Git。
 
-默认模式为 `Auto`，云端模型 `deepseek-flash`，本地后备 `qwen3:8b`。API Key 只从后端环境读取，状态接口只返回 `configured` 布尔值。两个 Provider 都不可用时，Task、Calendar、Routine 和统计 API 仍继续工作。系统不包含 RAG、多 Agent 或长期自动规划。
+默认模式为 `Auto`，云端模型 `deepseek-flash`，本地后备 `qwen3:8b`。API Key 只从后端环境读取，状态接口只返回 `configured` 布尔值。两个 Provider 都不可用时，所有普通页面和 API 仍继续工作。系统包含知识库文件归档，但不包含向量 RAG、多 Agent 或长期自动规划。

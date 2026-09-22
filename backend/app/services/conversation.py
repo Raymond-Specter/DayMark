@@ -42,9 +42,10 @@ def _with_attachments(content, attachments):
 
 
 def build_context(rows, message, options, system_prompt=SYSTEM_PROMPT, attachment_map=None, current_attachments=None):
-    # A conservative UTF-8 budget preserves full recent exchanges and always the
-    # current question/system prompt. It is a bound, not a model tokenizer.
-    budget = (options.num_ctx - 1024) * 2
+    # Chinese UTF-8 commonly uses three bytes per character/token-like unit.
+    # Reserve 1024 model tokens for tool schemas and the answer, then apply a
+    # byte bound to the system prompt, attachments and retained chat turns.
+    budget = (options.num_ctx - 1024) * 3
     attachment_map = attachment_map or {}
     current = [Message("system", system_prompt), Message("user", _with_attachments(message, current_attachments or []))]
     used = sum(len(m.content.encode("utf-8")) + 64 for m in current)

@@ -78,7 +78,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 .\stop.ps1 -IncludeAI
 ```
 
-打开 [AI Assistant](http://127.0.0.1:3000/assistant)，可以用自然语言查询或操作 Task、Calendar 和 Routine。Agent 通过受控工具调用现有业务 Service，成功后页面自动刷新；明确时间会检查冲突，删除和大批量改期需要确认，最近的任务操作可以撤销。模型不能直接执行 SQL，也不会修改 Goal。Thinking 开启时仍不展示内部推理。
+打开 [AI Assistant](http://127.0.0.1:3000/assistant)，可以用自然语言查询或操作 Task、Calendar、Routine、Goal、Project、Milestone、学习档案、知识库、每日复盘、统计、设置和通知。Agent 通过受控工具调用现有业务 Service，成功后页面自动刷新；明确时间会检查冲突，删除、课表导入和大批量改期需要确认，最近的任务操作可以撤销。模型不能直接执行 SQL，Thinking 开启时仍不展示内部推理。
 
 应用内 Agent 会在每次对话中读取 [功能与使用手册](backend/app/prompts/agent_manual.md)。新增或修改页面功能、Agent Tool、工作流程或能力边界时，必须在同一提交中同步更新该手册。
 

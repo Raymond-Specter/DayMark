@@ -43,6 +43,11 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 - “完成今天的托福任务。”
 - “撤销刚才那个操作。”
 - “今天下午3点到6点有事，把冲突任务重新安排。”
+- “从明天到 10 月 1 日，每天 07:00–08:00 晨读。”
+- “新建目标‘完成毕业设计’，并在下面创建项目‘原型开发’。”
+- “记录今天学习 Attention 90 分钟，进度 80%。”
+- “把刚上传的 lecture.pdf 保存到知识库。”
+- “保存今天复盘：实际投入 120 分钟，精力 4。”
 
 聊天区会显示“正在读取日历”“正在创建任务”等状态。成功写入后 Today、Task、Calendar、Routine 和统计数据自动刷新。明确时间发生冲突时不会覆盖原日程，而会报告冲突并询问是否换时间。
 
@@ -74,7 +79,7 @@ npm.cmd run build
 
 - 未配置 DeepSeek Key 时，Auto 会使用本地 Qwen；DeepSeek 模式会明确提示配置 Key。
 - Qwen3 8B 是小型本地模型，复杂或含糊指令可能需要更明确的任务名、日期或时间。
-- Agent 只操作 Task、Calendar 与 Routine，不修改 Goal；Project 仅作为可选关联 ID。
+- Agent 可以通过受控工具操作页面中的 Task、Calendar、Routine、Goal、Project、Milestone、学习档案、知识库附件、每日复盘、统计、时区/默认开始时间和通知；删除等破坏性操作仍需确认。
 - 调度采用确定性 first-fit，不做复杂最优化，也不会自主制定长期计划。
 - 操作引用主要来自当前会话最近成功动作；跨会话含糊说“刚才那个”时应补充任务名。
-- 没有 RAG、Knowledge Base 或多 Agent。
+- 已有 Knowledge Base 文件归档和筛选，但没有向量 RAG、多 Agent 或长期自主规划。

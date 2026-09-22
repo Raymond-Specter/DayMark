@@ -23,6 +23,7 @@ from app.services.llm.ollama_provider import OllamaProvider
 from app.services.llm.service import LLMService
 from app.agent.permissions import ToolPermission
 from app.agent.registry import build_registry
+from app.agent.agent_service import MANUAL, PROMPT
 
 
 class FakeProvider:
@@ -328,6 +329,15 @@ def test_context_budget_keeps_latest_full_pairs():
     assert context[0].role == "system" and context[-1].content == "最新问题"
     assert context[-2].content.startswith("回答7")
     assert [m.role for m in context[1:-1]] == ["user", "assistant"] * ((len(context) - 2) // 2)
+
+
+def test_agent_manual_and_course_attachment_fit_default_context():
+    prompt = PROMPT.format(current_datetime="2026-09-23 09:00:00", timezone="Asia/Shanghai") + "\n\n" + MANUAL
+    attachment = SimpleNamespace(filename="schedule.pdf", extracted_text="课程内容" * 525)
+    context, trimmed = build_context([], "请读取课表", GenerationOptions(num_ctx=8192),
+                                     system_prompt=prompt, current_attachments=[attachment])
+    assert len(context) == 2 and not trimmed
+    assert "schedule.pdf" in context[-1].content
 
 
 def test_oversized_context_does_not_save_or_acquire_slot(client, ai):

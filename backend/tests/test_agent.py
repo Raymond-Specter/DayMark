@@ -5,7 +5,11 @@ from sqlalchemy import select
 from app.agent.agent_service import AgentService, MANUAL
 from app.agent.registry import build_registry
 from app.agent.tool_executor import ToolExecutor
-from app.models import AgentActionLog, CalendarEvent, Conversation, Routine, Task
+from app.agent.tools import PlanningTools
+from app.agent import workspace_tools
+from app.models import (AgentActionLog, CalendarEvent, ChatAttachment, Conversation, Goal,
+                        KnowledgeDocument, LearningEntry, Milestone, Project, Routine, Task)
+from app.services import attachments
 from app.services.llm.base import ChatChunk, GenerationOptions, Message
 from app.services.llm.service import LLMService
 
@@ -29,11 +33,106 @@ def test_agent_manual_is_loaded_and_documents_every_tool(session_factory):
     registry, tool_executor = executor(session_factory)
     for name in registry.definitions:
         assert f"`{name}`" in MANUAL
+    assert all(hasattr(PlanningTools, definition.handler) for definition in registry.definitions.values())
+    assert len(registry.schemas()) == len(registry.definitions)
     agent = AgentService(None, registry, tool_executor, session_factory)
     with session_factory() as db:
         prompt = agent.system_prompt(db)
     assert "# DayMark Agent 功能与使用手册" in prompt
     assert "Task 的预计用时等于结束时间减开始时间" in prompt
+
+
+def test_recurring_language_routes_to_create_routine(session_factory):
+    registry, tool_executor = executor(session_factory)
+    agent = AgentService(None, registry, tool_executor, session_factory)
+    names = {item["function"]["name"] for item in agent._tool_schemas(
+        "从明天到 10 月 1 日，每天 07:00 到 08:00 晨读")}
+    assert "create_routine" in names and "create_task" not in names
+    milestone_names = {item["function"]["name"] for item in agent._tool_schemas("修改里程碑截止日期")}
+    assert milestone_names == {"get_milestones", "update_milestone"}
+    hierarchy_names = {item["function"]["name"] for item in agent._tool_schemas(
+        "新建目标毕业设计，并在下面创建项目原型开发")}
+    assert {"create_goal", "get_goals", "create_project"} <= hierarchy_names
+    learning_names = {item["function"]["name"] for item in agent._tool_schemas(
+        "记录今天学习 Attention 90 分钟，进度 80%")}
+    assert "create_learning_entry" in learning_names and "create_task" not in learning_names
+    event_names = {item["function"]["name"] for item in agent._tool_schemas("明天 10 点有个项目会议")}
+    assert "create_event" in event_names
+    knowledge_names = {item["function"]["name"] for item in agent._tool_schemas(
+        "把刚上传的课件.pdf 保存到知识库")}
+    assert "save_attachment_to_knowledge" in knowledge_names
+
+
+def test_workspace_tools_cover_manual_page_operations(session_factory):
+    _, tools = executor(session_factory)
+    with session_factory() as db:
+        conversation = Conversation(); db.add(conversation); db.commit(); key = conversation.id
+    goal = tools.execute(key, "create_goal", {"name": "毕业设计", "target_date": "2026-12-31"})
+    project = tools.execute(key, "create_project", {"name": "原型开发", "goal_id": goal.data["id"]})
+    milestone = tools.execute(key, "create_milestone", {
+        "name": "完成原型", "project_id": project.data["id"], "deadline": "2026-10-31"})
+    event = tools.execute(key, "create_event", {
+        "title": "组会", "start": "2026-09-22T10:00", "end": "2026-09-22T11:00"})
+    learning = tools.execute(key, "create_learning_entry", {
+        "date": "2026-09-21", "title": "复习 Attention", "project_id": project.data["id"],
+        "duration_minutes": 90, "progress": 80})
+    review = tools.execute(key, "save_daily_review", {
+        "date": "2026-09-21", "actual_minutes": 90, "energy_level": 4,
+        "project_minutes": {project.data["id"]: 90}})
+    stats = tools.execute(key, "get_statistics", {"date": "2026-09-21"})
+    setting = tools.execute(key, "update_settings", {"day_start": "08:30"})
+    updated_goal = tools.execute(key, "update_goal", {"record_id": goal.data["id"], "status": "completed"})
+    updated_event = tools.execute(key, "update_event", {"event_id": event.data["id"], "title": "项目组会"})
+    updated_learning = tools.execute(key, "update_learning_entry", {
+        "record_id": learning.data["id"], "progress": 100, "status": "completed"})
+    progress = tools.execute(key, "get_progress", {})
+    ai_setting = tools.execute(key, "update_ai_settings", {"mode": "local", "temperature": 0.2})
+    export = tools.execute(key, "prepare_data_export", {})
+    assert all(result.success for result in (goal, project, milestone, event, learning, review, stats,
+                                              setting, updated_goal, updated_event, updated_learning,
+                                              progress, ai_setting, export))
+    assert stats.data["actual_minutes"] == 90 and setting.data["day_start"] == "08:30"
+    assert updated_goal.data["status"] == "completed" and updated_event.data["title"] == "项目组会"
+    assert updated_learning.data["progress"] == 100
+    assert ai_setting.data["mode"] == "local" and export.data["download_url"] == "/api/export"
+    with session_factory() as db:
+        assert db.get(Goal, goal.data["id"]) and db.get(Project, project.data["id"])
+        assert db.get(Milestone, milestone.data["id"]) and db.get(LearningEntry, learning.data["id"])
+
+
+def test_uploaded_chat_attachment_can_be_saved_to_knowledge(session_factory, tmp_path, monkeypatch):
+    upload_dir, knowledge_dir = tmp_path / "uploads", tmp_path / "knowledge"
+    upload_dir.mkdir(); monkeypatch.setattr(attachments, "UPLOAD_DIR", upload_dir)
+    monkeypatch.setattr(workspace_tools, "KNOWLEDGE_DIR", knowledge_dir)
+    content = b"# Lecture notes\nAttention and transformers"
+    (upload_dir / "stored.md").write_bytes(content)
+    with session_factory() as db:
+        conversation = Conversation(); db.add(conversation); db.flush()
+        db.add(ChatAttachment(conversation_id=conversation.id, filename="lecture.md",
+                              media_type="text/markdown", size_bytes=len(content),
+                              storage_name="stored.md", extracted_text=content.decode()))
+        db.commit(); key = conversation.id
+    _, tools = executor(session_factory)
+    result = tools.execute(key, "save_attachment_to_knowledge", {
+        "filename": "lecture.md", "knowledge_date": "2026-09-21", "document_type": "note"})
+    assert result.success and result.data["processing_status"] == "ready"
+    with session_factory() as db:
+        row = db.get(KnowledgeDocument, result.data["id"])
+        assert row.extracted_text.startswith("# Lecture")
+        assert (knowledge_dir / row.storage_path).read_bytes() == content
+
+
+def test_non_task_deletes_use_saved_confirmation(session_factory):
+    _, tools = executor(session_factory)
+    with session_factory() as db:
+        conversation = Conversation(); db.add(conversation); db.commit(); key = conversation.id
+    goal = tools.execute(key, "create_goal", {"name": "临时目标"})
+    pending = tools.execute(key, "delete_goal", {"record_id": goal.data["id"]})
+    assert pending.error_code == "CONFIRMATION_REQUIRED"
+    deleted = tools.confirm(key, pending.confirmation["action_id"], True)
+    assert deleted.success
+    with session_factory() as db:
+        assert db.get(Goal, goal.data["id"]) is None
 
 
 def test_minimum_agent_loop_creates_real_task_and_reads_it(session_factory):

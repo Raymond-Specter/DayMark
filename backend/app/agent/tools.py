@@ -12,6 +12,7 @@ from ..services.planner import PlannerService
 from ..services.scheduler import SchedulerService
 from .planner_service import AgentPlannerService, clock, minutes
 from .schemas import ToolResult
+from .workspace_tools import WorkspaceTools
 
 
 @dataclass
@@ -21,7 +22,7 @@ class Handled:
     after: dict | None = None
 
 
-class PlanningTools:
+class PlanningTools(WorkspaceTools):
     def __init__(self, db, conversation_id: str):
         self.db, self.conversation_id = db, conversation_id
         self.planner = AgentPlannerService(db)
@@ -75,7 +76,9 @@ class PlanningTools:
 
     def create_task(self, args):
         task, conflicts = self.planner.create(args.title, args.date, args.start_time, args.end_time,
-                                              args.duration_minutes, args.project_id, args.priority, args.description)
+                                              args.duration_minutes, args.project_id, args.priority, args.description,
+                                              args.milestone_id, args.deadline, args.reminder,
+                                              args.depends_on_task_id, args.track_learning)
         if conflicts:
             return Handled(ToolResult(success=False, error_code="TIME_CONFLICT",
                                       message="指定时间与现有日历事项冲突。", data={"conflicts": conflicts}))
@@ -91,7 +94,7 @@ class PlanningTools:
         task = require(self.db, Task, args.task_id)
         before = raw(task)
         fields = {key: getattr(task, key) for key in TaskIn.model_fields if key != "version"}
-        supplied = args.model_dump(exclude_none=True, exclude={"task_id"})
+        supplied = args.model_dump(exclude_unset=True, exclude={"task_id"})
         if "duration_minutes" in supplied:
             supplied["estimated_duration"] = supplied.pop("duration_minutes")
         fields.update(supplied)
@@ -123,6 +126,13 @@ class PlanningTools:
         return self.ok(f"已完成任务“{task.title}”。", task_dict(self.db, task),
                        [{"type": "task", "id": task.id}], before, raw(task))
 
+    def reopen_task(self, args):
+        task = require(self.db, Task, args.task_id)
+        before = raw(task)
+        task = PlannerService(self.db).action(task, TaskAction(action="reopen", version=task.version))
+        return self.ok(f"已重新打开任务“{task.title}”。", task_dict(self.db, task),
+                       [{"type": "task", "id": task.id}], before, raw(task))
+
     def cancel_task(self, args):
         task = require(self.db, Task, args.task_id)
         before = raw(task)
@@ -130,12 +140,18 @@ class PlanningTools:
         return self.ok(f"已取消任务“{task.title}”。", task_dict(self.db, task),
                        [{"type": "task", "id": task.id}], before, raw(task))
 
+    def keep_task_overdue(self, args):
+        task = require(self.db, Task, args.task_id)
+        before = raw(task)
+        task = PlannerService(self.db).action(task, TaskAction(action="keep_overdue", version=task.version))
+        return self.ok(f"已保留逾期任务“{task.title}”。", task_dict(self.db, task),
+                       [{"type": "task", "id": task.id}], before, raw(task))
+
     def create_routine(self, args):
         values = args.model_dump()
-        values.update(interval_unit="days", milestone_id=None, reminder=None, active=True,
-                      depends_on_routine_id=None, offset_days=0)
         checked = RoutineIn(**values)
         PlannerService(self.db).validate_links(checked.model_dump())
+        SchedulerService(self.db).validate_dependency(None, checked.depends_on_routine_id)
         row = Routine(**checked.model_dump(exclude={"version"}))
         self.db.add(row)
         self.db.flush()
@@ -171,12 +187,19 @@ class PlanningTools:
     def update_routine(self, args):
         row = require(self.db, Routine, args.routine_id)
         before = raw(row)
+        was_active = row.active
         values = {key: getattr(row, key) for key in RoutineIn.model_fields if key != "version"}
-        values.update(args.model_dump(exclude_none=True, exclude={"routine_id"}))
+        values.update(args.model_dump(exclude_unset=True, exclude={"routine_id"}))
         checked = RoutineIn(**values, version=row.version)
+        PlannerService(self.db).validate_links(checked.model_dump())
+        SchedulerService(self.db).validate_dependency(row.id, checked.depends_on_routine_id)
         SchedulerService(self.db).materialize(end=today(self.db))
+        changes = checked.model_dump(exclude={"version"})
+        if not was_active and checked.active:
+            changes["materialized_through"] = max(
+                row.materialized_through or "0001-01-01", (today(self.db) - timedelta(days=1)).isoformat())
         changed = self.db.execute(update(Routine).where(Routine.id == row.id, Routine.version == row.version)
-                                  .values(**checked.model_dump(exclude={"version"}), version=row.version + 1, updated_at=now_iso()))
+                                  .values(**changes, version=row.version + 1, updated_at=now_iso()))
         if changed.rowcount != 1:
             raise HTTPException(409, "重复任务已更新，请重试")
         self.db.refresh(row)
@@ -191,6 +214,18 @@ class PlanningTools:
         SchedulerService(self.db).refresh_future(row)
         self.db.flush()
         return self.ok(f"已暂停重复任务“{row.name}”。", raw(row),
+                       [{"type": "routine", "id": row.id}], before, raw(row))
+
+    def delete_routine(self, args):
+        row = require(self.db, Routine, args.routine_id)
+        if self.db.scalar(select(Routine).where(Routine.depends_on_routine_id == row.id,
+                                                Routine.deleted_at.is_(None))):
+            raise HTTPException(409, "其他重复任务仍依赖此规则，请先修改依赖")
+        before = raw(row)
+        row.active, row.deleted_at, row.version = False, now_iso(), row.version + 1
+        SchedulerService(self.db).refresh_future(row)
+        self.db.flush()
+        return self.ok(f"已删除重复任务“{row.name}”。", {"deleted": True},
                        [{"type": "routine", "id": row.id}], before, raw(row))
 
     def schedule_task(self, args):

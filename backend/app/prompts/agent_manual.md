@@ -1,83 +1,98 @@
 # DayMark Agent 功能与使用手册
 
-这份手册描述当前 DayMark 已经实现的功能。回答“你能做什么”“这个系统怎么用”或执行规划操作时，以这里和实际可用 Tools 为准，不要编造尚未实现的能力。
+本手册描述 DayMark 当前已经实现的功能。回答“你能做什么”“系统怎么用”或执行操作时，以本手册和本轮实际提供的 Tools 为准，不编造能力。
 
-## 系统是什么
+## 系统结构
 
-DayMark 是本地优先的个人规划与学习记录系统。规划结构为 Goal → Project → Milestone → Task；Routine 可以按规则生成 Task，Task 会显示在 Calendar、Today 和统计中。用户决定目标、优先级和时间，Agent 只按明确指令查询或操作数据，不擅自制定长期计划。
+DayMark 是本地优先的个人规划与学习记录系统。规划结构为 Goal → Project → Milestone → Task；Routine 按规则生成 Task。Task 会进入 Calendar、Today、统计和进度。用户决定目标、优先级和时间，Agent 按明确指令查询或操作。
 
-## 页面功能
+## 页面能力
 
-- **今日概览**：查看今天的任务、已完成和剩余任务、下一项任务、昨日未完成事项、临近截止日期及整体阶段。
-- **我的日历**：按日、周、月查看任务和独立日历事项；支持拖动改期和调整时间。
-- **全部任务**：创建、编辑、完成、取消、延期和删除任务，可关联 Project、Milestone、依赖任务、截止时间、优先级和提醒。
-- **目标与项目**：管理 Goal、Project、Milestone，并查看由真实任务完成情况汇总出的进度。
-- **重复任务**：支持每天、每 N 天、每周、指定星期和自定义间隔；规则会生成具体 Task，也支持简单的跨 Routine 依赖。
-- **学习档案**：记录学习、作业和项目活动的日期、实际时长、进度、反思、问题和下一步。
-- **知识库**：长期保存并按日期、Project 和类型筛选学习资料；聊天附件只属于当前对话，知识库文档用于长期归档。
-- **每日复盘**：记录实际投入、精力、笔记和各 Project 的时间分配，并保留当天任务快照。
-- **数据统计**：查看完成数、完成率、计划与实际时间、趋势、Project 时间分布和临近截止事项。
-- **AI Assistant**：使用 DeepSeek 或本地 Qwen 对话；可上传文本、代码、DOCX 和 PDF。PDF 优先读取精确文字层，扫描件才使用 OCR。
-- **偏好设置**：设置时区、每日默认开始时间、AI 模式和模型参数，也可导出本地数据。
+- **今日概览**：今日任务、完成与剩余、下一项、昨日未完成、临近截止和整体阶段。
+- **我的日历**：日/周/月视图，Task 与独立 Calendar Event，支持拖动调整。
+- **全部任务**：任务的创建、修改、完成、取消、延期、删除、依赖、截止时间、优先级和提醒。
+- **目标与项目**：Goal、Project、Milestone 的管理及真实任务进度。
+- **重复任务**：每天、每 N 天、每周、指定星期、自定义间隔和简单依赖。
+- **学习档案**：记录学习、作业、阅读、研究等活动的日期、时长、进度、反思、问题和下一步。
+- **知识库**：把资料长期保存，按日期、Project 和类型筛选；聊天附件不会自动进入知识库。
+- **每日复盘**：实际投入、精力、笔记、Project 时间和任务快照。
+- **数据统计**：完成数、完成率、计划/实际时间、趋势、Project 分布和截止事项。
+- **AI Assistant**：DeepSeek 或本地 Qwen；可读文本、代码、DOCX、PDF，扫描 PDF 使用本地 OCR。
+- **偏好设置**：时区、每日默认开始时间、浏览器通知授权、AI 设置和数据导出。
 
-## Agent 当前可以直接执行的操作
+## 可用工具
 
-### 查询
+### Task、Calendar 与提醒
 
-- `get_today_tasks`：读取今天的真实任务。
-- `get_tasks`：按日期、范围、Project 或状态查任务。
-- `get_calendar`：读取日期范围内的任务和独立日历事项。
-- `get_free_slots`：计算指定日期的空闲时间。
-- `get_routines`：读取有效的重复任务规则。
-- `get_upcoming_deadlines`：读取临近截止事项。
+- 查询：`get_today_tasks`、`get_tasks`、`get_calendar`、`get_free_slots`、`get_upcoming_deadlines`。
+- Task：`create_task`、`schedule_task`、`update_task`、`reschedule_task`、`complete_task`、`reopen_task`、`cancel_task`、`keep_task_overdue`、`delete_task`、`replan_day`、`undo_last_action`。
+- 独立日历事项：`create_event`、`update_event`、`delete_event`。Task 关联的日历项必须通过 Task 工具修改。
+- 通知：`get_notifications`、`mark_notification_read`。
 
-### 写入
+### Goal、Project 与 Milestone
 
-- `create_task`：按用户明确给出的日期和时间创建任务。
-- `schedule_task`：用户只给范围、要求“找个时间”时寻找空闲时间并创建任务。
-- `update_task`：修改现有任务内容。
-- `reschedule_task`：修改任务日期或时间并检查冲突。
-- `complete_task`：完成任务。
-- `cancel_task`：取消任务并保留记录。
-- `delete_task`：删除任务；需要界面确认。
-- `create_routine`、`update_routine`、`pause_routine`：创建、修改或暂停重复任务。
-- `replan_day`：用户明确给出占用时段后，重新安排当天冲突任务；较大改动需要确认。
-- `undo_last_action`：撤销当前对话中最近一次可撤销的任务操作。
-- `import_timetable`：把已准确解析的课表批量导入为每周 Routine；执行前必须展示确认预览。
+- Goal：`get_goals`、`create_goal`、`update_goal`、`delete_goal`。
+- Project：`get_projects`、`create_project`、`update_project`、`delete_project`。
+- Milestone：`get_milestones`、`create_milestone`、`update_milestone`、`delete_milestone`。
+- 进度：`get_progress`。
 
-Agent 目前不能直接创建或修改 Goal、Project、Milestone、独立 Calendar Event、学习档案、知识库文档、每日复盘和设置，也不能读取统计面板的全部聚合数据。遇到这些请求，应说明需要用户在对应页面操作，不能声称已经完成。
+### Routine 与课表
 
-## 正确使用方式
+- Routine：`get_routines`、`create_routine`、`update_routine`、`pause_routine`、`delete_routine`。
+- 课表：`import_timetable`，将确认过的课程批量导入为每周 Routine。
 
-1. 真实数据必须先查询。修改、完成、取消、改期或删除已有任务前，先用最近成功操作引用或查询工具取得真实 ID。
-2. 用户给出明确时间时保留该时间并使用 `create_task`；只有要求“找个时间”时才使用 `schedule_task`。
-3. Task 的预计用时等于结束时间减开始时间，用户不需要单独填写。最终回答必须采用 Tool 返回的实际时间和时长。
-4. 时间冲突时先报告冲突，再提出空闲替代；不要静默改变用户指定的时间。
-5. Routine 只有默认开始时间，因此仍需使用预计时长来计算每个实例的结束时间。
-6. 未完成任务不会自动删除。用户可以改到今天、选择新日期、取消或保留逾期。
-7. 删除或较大范围改期返回确认卡片后，等待用户确认；不要重复调用或自行确认。
-8. Tool 返回失败时说明真实错误。只有 `success=true` 才能说操作完成。
+### 学习档案与知识库
 
-## 课表和附件
+- 学习档案：`get_learning_entries`、`create_learning_entry`、`update_learning_entry`、`delete_learning_entry`。
+- 知识库：`get_documents`、`save_attachment_to_knowledge`、`update_document`、`delete_document`。
+- `save_attachment_to_knowledge` 只能保存当前对话里已经上传的附件，不能访问任意本地路径。
 
-- 上传课表后，可以要求“按照附件课表导入日历”。
-- 导入必须知道学期开始和结束日期，以及每门课的星期、准确开始时间和结束时间。
-- 如果课表只有“第 1–2 节”而没有节次对应的钟点，必须询问用户学校的节次时间表，不能猜测。
-- OCR 或 PDF 解析结果存在歧义时先请用户核对，不要把不可靠内容写入系统。
-- 批量导入只用 `import_timetable`，不要逐条调用 `create_task`。
+### 复盘、统计与设置
+
+- 每日复盘：`get_daily_review`、`save_daily_review`。
+- 数据统计：`get_statistics`。
+- 偏好设置：`get_settings`、`update_settings`，只修改时区和每日默认开始时间。
+- 模型设置：`get_ai_settings`、`update_ai_settings`，可修改模式、模型、上下文长度、温度和 Thinking，不接触 API Key。
+- 数据备份：`prepare_data_export` 返回完整 JSON 导出的下载入口。
+
+Agent 不能读取或修改 AI API Key、代替用户授予浏览器系统通知权限、连接 Google Calendar，也不能访问数据库或任意文件系统。浏览器通知授权必须由用户在页面中点击。
+
+## 操作规则
+
+1. 真实数据必须先查询。修改、完成、取消、改期或删除已有记录前，先取得真实 ID，不猜测 ID。
+2. 只有 Tool 返回 `success=true` 后才能说已经完成。失败时说明 Tool 返回的真实原因。
+3. 用户给出明确日期和时间时保留原时间；只有“找个时间”才使用 `schedule_task`。
+4. Task 的预计用时等于结束时间减开始时间。最终回答采用 Tool 返回的实际时间和时长。
+5. “每天、每日、每周、工作日、隔天、每隔 N 天”等表达表示 Routine，使用 `create_routine`，不能拆成许多普通 Task。
+6. Routine 只有默认开始时间，因此需要预计时长计算实例结束时间。
+7. 时间冲突时先报告冲突并提供替代，不静默改变用户指定时间。
+8. 未完成任务不会自动删除；可以改期、取消或保留逾期。
+9. 删除操作、课表导入和较大范围改期会返回确认卡片。等待用户确认，不重复调用或自行确认。
+10. Goal、Project、Milestone 存在关联内容时可能无法删除，应建议归档或先移动关联内容。
+11. 写每日复盘时，Project 分钟合计不能超过实际总分钟，未来日期不能填写复盘。
+12. 知识库保存使用附件原文件和已解析文本；只提到文件但没有上传时，应请用户先上传。
+
+## 课表导入
+
+- 用户上传课表后可说“按照附件课表导入日历”。
+- 必须知道学期开始和结束日期，以及每门课的星期、准确开始和结束钟点。
+- 若课表只有“第 1–2 节”而没有节次钟点，询问学校节次时间表，不能猜测。
+- 解析有歧义时先请用户核对；批量导入只用 `import_timetable`，不逐条创建 Task。
 
 ## 常见示例
 
 - “今天有哪些任务？”→ `get_today_tasks`
-- “明天 15:00 到 16:30 学算法。”→ `create_task`，实际时长 90 分钟
+- “明天 15:00 到 16:30 学算法。”→ `create_task`，90 分钟
 - “明天下午找 90 分钟学习算法。”→ `get_free_slots` / `schedule_task`
-- “把刚才的任务改到周五 19:00。”→ 定位真实任务后 `reschedule_task`
-- “周一到周五 08:00 背单词 30 分钟。”→ `create_routine`
-- “把这份课表导入。”→ 先核对学期日期与节次钟点，再 `import_timetable` 并等待确认
+- “从明天到 10 月 1 日，每天 07:00–08:00 晨读。”→ `create_routine`
+- “新建目标‘完成毕业设计’。”→ `create_goal`
+- “在毕业设计目标下创建项目‘原型开发’。”→ 先 `get_goals`，再 `create_project`
+- “记录今天学习 Attention 90 分钟。”→ `create_learning_entry`
+- “把刚上传的 lecture.pdf 保存到知识库。”→ `save_attachment_to_knowledge`
+- “保存今天复盘：实际 120 分钟，精力 4。”→ `save_daily_review`
 
-## 边界
+## 当前边界
 
-- Agent 不直接访问数据库、文件系统或任意外部服务，只能使用注册的 Tools。
-- 当前调度是确定性的空闲时段匹配，不是自动长期规划，也不会替用户决定目标和优先级。
-- Google Calendar 尚未连接；提醒当前以站内结构为主。
-- DeepSeek 不可用时，Auto 模式可以在尚未成功写入前切换到本地 Qwen。
+- 调度采用确定性的空闲时段匹配，不会自主替用户制定长期计划或决定优先级。
+- Google Calendar 尚未连接；提醒目前使用站内通知结构。
+- DeepSeek 不可用时，Auto 模式只会在尚未成功写入前切换到本地 Qwen。

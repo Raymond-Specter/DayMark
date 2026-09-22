@@ -72,12 +72,13 @@ Goal 输入包含 name、description、start_date、target_date、status、prior
   "date": "2026-09-20",
   "start_time": "09:00",
   "end_time": "10:00",
-  "estimated_duration": 60,
   "priority": 2,
   "reminder": 10,
   "depends_on_task_id": null
 }
 ```
+
+Task 同时提供开始和结束时间时，后端以两者之差自动写入 `estimated_duration`，忽略客户端传入的不一致数值；无时间任务可使用 0。Routine 只有默认开始时间，因此仍显式使用 `estimated_duration`。
 
 完成动作请求：`{"action":"complete","version":1}`。延期请求：`{"action":"reschedule","date":"2026-09-21","version":1}`；可同时传新的 start_time / end_time。业务状态不能靠任意字段直接覆盖。
 

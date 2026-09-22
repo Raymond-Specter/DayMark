@@ -75,7 +75,8 @@ class AgentPlannerService:
             slots.append({"start_time": clock(cursor), "end_time": clock(end), "duration_minutes": end - cursor})
         return slots
 
-    def create(self, title, day, start_time, end_time, duration, project_id=None, priority=2, description=""):
+    def create(self, title, day, start_time, end_time, duration, project_id=None, priority=2, description="",
+               milestone_id=None, deadline=None, reminder=None, depends_on_task_id=None, track_learning=False):
         if start_time and not end_time:
             finish = minutes(start_time) + duration
             if finish >= 1440:
@@ -87,6 +88,8 @@ class AgentPlannerService:
         task = PlannerService(self.db).create_task(TaskIn(
             title=title, date=day, start_time=start_time, end_time=end_time,
             estimated_duration=duration, project_id=project_id, priority=priority, description=description,
+            milestone_id=milestone_id, deadline=deadline, reminder=reminder,
+            depends_on_task_id=depends_on_task_id, track_learning=track_learning,
         ))
         return task, []
 
