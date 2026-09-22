@@ -49,7 +49,8 @@ def test_recurring_language_routes_to_create_routine(session_factory):
         "从明天到 10 月 1 日，每天 07:00 到 08:00 晨读")}
     assert "create_routine" in names and "create_task" not in names
     milestone_names = {item["function"]["name"] for item in agent._tool_schemas("修改里程碑截止日期")}
-    assert milestone_names == {"get_milestones", "update_milestone"}
+    assert {"get_projects", "get_milestones", "create_milestone",
+            "update_milestone", "delete_milestone"} == milestone_names
     hierarchy_names = {item["function"]["name"] for item in agent._tool_schemas(
         "新建目标毕业设计，并在下面创建项目原型开发")}
     assert {"create_goal", "get_goals", "create_project"} <= hierarchy_names
@@ -61,6 +62,31 @@ def test_recurring_language_routes_to_create_routine(session_factory):
     knowledge_names = {item["function"]["name"] for item in agent._tool_schemas(
         "把刚上传的课件.pdf 保存到知识库")}
     assert "save_attachment_to_knowledge" in knowledge_names
+
+
+def test_goal_domain_exposes_complete_tools_and_handles_colloquial_create(session_factory):
+    registry, tool_executor = executor(session_factory)
+    agent = AgentService(None, registry, tool_executor, session_factory)
+    names = {item["function"]["name"] for item in agent._tool_schemas(
+        "我要哦订一个目标就是10月2日考托福")}
+    assert {"get_goals", "create_goal", "update_goal", "delete_goal"} <= names
+
+
+def test_short_confirmation_inherits_recent_tool_intent(session_factory):
+    registry, tool_executor = executor(session_factory)
+    agent = AgentService(None, registry, tool_executor, session_factory)
+    messages = [
+        Message("system", "system"),
+        Message("user", "我要哦订一个目标就是10月2日考托福"),
+        Message("assistant", "请确认"),
+        Message("user", "都行"),
+        Message("assistant", "请再次确认"),
+        Message("user", "确认"),
+    ]
+    routing_text = agent._routing_text(messages)
+    assert "10月2日考托福" in routing_text
+    names = {item["function"]["name"] for item in agent._tool_schemas(routing_text)}
+    assert "create_goal" in names
 
 
 def test_workspace_tools_cover_manual_page_operations(session_factory):

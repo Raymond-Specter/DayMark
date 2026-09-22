@@ -17,7 +17,7 @@ Agent Loop 最多执行 8 步。模型返回 tool call 后，执行器调用注�
 
 ## 模块职责
 
-- `backend/app/agent/agent_service.py`：循环、当前时间、会话实体引用、按意图缩小工具集合、防止假执行。
+- `backend/app/agent/agent_service.py`：循环、当前时间、会话实体引用、按功能域选择完整工具包、短回复意图继承和防止假执行。
 - `backend/app/agent/tool_registry.py` 与 `registry.py`：统一 JSON Schema、权限和用户可见状态文案。
 - `backend/app/agent/tool_executor.py`：参数验证、权限、确认、调用日志和异常净化。
 - `backend/app/agent/tools.py` 与 `workspace_tools.py`：覆盖页面可人工操作的数据，复用既有 Schema、Service 和业务校验。
@@ -34,6 +34,8 @@ Agent Loop 最多执行 8 步。模型返回 tool call 后，执行器调用注�
 READ 查询自动执行，覆盖 Task、Calendar、Routine、Goal、Project、Milestone、学习档案、知识库、每日复盘、统计、设置和通知。
 
 WRITE 创建与修改自动执行并写 `AgentActionLog`。每个工具复用页面对应的 Schema、关联校验和 Service；知识库工具只能复制当前对话已上传的附件，不能读取任意路径。完整工具名和行为以运行时加载的 [Agent 手册](../backend/app/prompts/agent_manual.md) 为准。
+
+为控制本地模型的上下文占用，系统不会在每轮发送全部工具 Schema，而是按 Goal、Project、Routine、知识库等功能域发送该域的完整工具包。用户只回复“确认”“都行”等短句时，路由会合并最近用户请求，保留上一轮的工具域和操作意图。本轮实际工具名也会写入系统提示，防止模型错误声称某个已提供工具不可用。
 
 所有 `delete_*` 工具均为 DESTRUCTIVE，必须确认。课表导入始终确认；一次 `replan_day` 影响超过 3 个任务时也动态升级为需确认操作。后端把精确工具名和参数保存到 `PendingAgentAction`，确认接口执行保存的动作，不让模型重新生成参数。
 

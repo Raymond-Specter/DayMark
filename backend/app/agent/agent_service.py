@@ -46,12 +46,13 @@ class AgentService:
         failed_calls = {}
         working = list(messages)
         user_text = next((message.content for message in reversed(working) if message.role == "user"), "")
-        requires_tool = self._requires_tool(user_text)
+        routing_text = self._routing_text(working)
+        requires_tool = self._requires_tool(routing_text)
         # Completed prose from earlier turns can teach a small local model to
         # imitate an answer instead of invoking a tool. Action context is kept
         # in the system prompt as verified entity references, so tool-bound
         # turns only need the system prompt and the current user request.
-        if requires_tool:
+        if requires_tool and routing_text == user_text:
             working = [working[0], working[-1]]
         used_tools = False
         successful_write = False
@@ -59,7 +60,11 @@ class AgentService:
         route = self.llm.create_session(mode, options) if hasattr(self.llm, "create_session") else None
         if route:
             await emit({"event": "provider_status", "provider": route.name, "model": route.options.model})
-        available_tools = self._tool_schemas(user_text)
+        available_tools = self._tool_schemas(routing_text)
+        available_names = [item["function"]["name"] for item in available_tools]
+        working[0] = Message("system", working[0].content +
+            "\n\n本轮实际可用工具：" + "、".join(available_names) +
+            "。这些工具已经可用，不得声称缺少其中任何一个工具。")
         for _ in range(self.max_steps):
             while True:
                 content, reasoning, calls = "", "", []
@@ -149,6 +154,17 @@ class AgentService:
         raise LLMError("tool_loop_limit", "工具调用次数过多，已停止且保留已经成功完成的操作。", 409)
 
     @staticmethod
+    def _routing_text(messages):
+        user_messages = [message.content for message in messages if message.role == "user"]
+        if not user_messages:
+            return ""
+        current = user_messages[-1].strip()
+        followups = ("确认", "确定", "可以", "好的", "好", "行", "都行", "就这样", "按这个", "继续", "是的", "对")
+        if len(current) <= 20 and any(marker in current for marker in followups):
+            return "\n".join(user_messages[-4:])
+        return current
+
+    @staticmethod
     def _requires_tool(text):
         markers = ("安排", "创建", "新建", "添加", "新增", "导入", "加入", "加到", "加上去", "记到", "放到",
                    "改到", "改期", "重新安排", "完成", "取消", "撤销", "删除", "暂停",
@@ -161,7 +177,8 @@ class AgentService:
 
     def _tool_schemas(self, text):
         names = {"get_tasks", "get_calendar", "get_free_slots"}
-        create_words = ("安排", "创建", "新建", "添加", "新增", "加入", "加到", "加上去", "记到", "放到", "保存", "记录")
+        create_words = ("安排", "创建", "新建", "添加", "新增", "加入", "加到", "加上去", "记到", "放到", "保存", "记录",
+                        "加一个", "建一个", "设一个", "定一个", "订一个", "做一个", "搞一个")
         update_words = ("修改", "更新", "改成", "改为", "编辑", "归档", "恢复")
         delete_words = ("删除", "移除")
         recurring = any(marker in text for marker in
@@ -174,17 +191,12 @@ class AgentService:
               and any(marker in text for marker in ("安排", "创建", "添加", "新增", "导入", "加入", "加到", "加上去", "记到", "放到"))):
             names = {"import_timetable"}
         elif "知识库" in text or "知识文档" in text:
-            if any(word in text for word in delete_words): names = {"get_documents", "delete_document"}
-            elif any(word in text for word in update_words): names = {"get_documents", "update_document"}
-            elif (any(marker in text.lower() for marker in ("附件", "刚上传", "上传的", "文件", ".pdf", ".docx", ".md", ".txt"))
-                  and any(word in text for word in create_words)):
-                names = {"get_projects", "save_attachment_to_knowledge"}
-            else: names = {"get_documents"}
+            names = {"get_documents", "save_attachment_to_knowledge", "update_document", "delete_document"}
+            if any(marker in text.lower() for marker in ("附件", "刚上传", "上传的", "文件", ".pdf", ".docx", ".md", ".txt")):
+                names.add("get_projects")
         elif learning_entry:
-            if any(word in text for word in delete_words): names = {"get_learning_entries", "delete_learning_entry"}
-            elif any(word in text for word in update_words): names = {"get_learning_entries", "update_learning_entry"}
-            elif any(word in text for word in create_words): names = {"get_projects", "get_tasks", "create_learning_entry"}
-            else: names = {"get_learning_entries"}
+            names = {"get_learning_entries", "create_learning_entry", "update_learning_entry",
+                     "delete_learning_entry", "get_projects", "get_tasks"}
         elif "复盘" in text:
             names = {"get_projects", "get_daily_review", "save_daily_review"} if any(
                 word in text for word in create_words + update_words + ("写", "填写")) else {"get_daily_review"}
@@ -193,47 +205,30 @@ class AgentService:
         elif any(marker in text for marker in ("整体进度", "目标进度", "项目进度", "当前阶段")):
             names = {"get_progress"}
         elif "偏好设置" in text or "默认开始时间" in text or "时区" in text:
-            names = {"get_settings", "update_settings"} if any(word in text for word in update_words) else {"get_settings"}
+            names = {"get_settings", "update_settings"}
         elif "模型设置" in text or "AI 模式" in text or "Thinking" in text or "上下文长度" in text:
-            names = {"get_ai_settings", "update_ai_settings"} if any(word in text for word in update_words) else {"get_ai_settings"}
+            names = {"get_ai_settings", "update_ai_settings"}
         elif "导出" in text or "备份数据" in text:
             names = {"prepare_data_export"}
         elif "通知" in text or "提醒消息" in text:
-            names = {"get_notifications", "mark_notification_read"} if "已读" in text else {"get_notifications"}
+            names = {"get_notifications", "mark_notification_read"}
         elif ("目标" in text and "项目" in text and not recurring
               and any(word in text for word in create_words)):
             names = {"create_goal", "get_goals", "create_project"}
             if "里程碑" in text or "阶段节点" in text:
                 names.update({"get_projects", "create_milestone"})
         elif ("里程碑" in text or "阶段节点" in text) and not recurring:
-            if any(word in text for word in delete_words): names = {"get_milestones", "delete_milestone"}
-            elif any(word in text for word in update_words): names = {"get_milestones", "update_milestone"}
-            elif any(word in text for word in create_words): names = {"get_projects", "create_milestone"}
-            else: names = {"get_milestones"}
+            names = {"get_projects", "get_milestones", "create_milestone", "update_milestone", "delete_milestone"}
         elif ("项目" in text and not recurring
               and not any(marker in text for marker in ("项目时间", "项目进度", "项目会议", "日程", "日历事项"))):
-            if any(word in text for word in delete_words): names = {"get_projects", "delete_project"}
-            elif any(word in text for word in update_words): names = {"get_goals", "get_projects", "update_project"}
-            elif any(word in text for word in create_words): names = {"get_goals", "create_project"}
-            else: names = {"get_projects"}
+            names = {"get_goals", "get_projects", "create_project", "update_project", "delete_project"}
         elif "目标" in text and not recurring:
-            if any(word in text for word in delete_words): names = {"get_goals", "delete_goal"}
-            elif any(word in text for word in update_words): names = {"get_goals", "update_goal"}
-            elif any(word in text for word in create_words): names = {"create_goal"}
-            else: names = {"get_goals"}
+            names = {"get_goals", "create_goal", "update_goal", "delete_goal"}
         elif recurring:
-            if any(word in text for word in delete_words): names = {"get_routines", "delete_routine"}
-            elif "暂停" in text: names = {"get_routines", "pause_routine"}
-            elif any(word in text for word in update_words): names = {"get_routines", "update_routine"}
-            elif any(word in text for word in create_words) or "从" in text: names = {"get_projects", "get_routines", "create_routine"}
-            else: names = {"get_routines"}
+            names = {"get_projects", "get_routines", "create_routine", "update_routine",
+                     "pause_routine", "delete_routine"}
         elif any(marker in text for marker in ("独立日历事项", "日历事项", "会议", "日程")) and "任务" not in text:
-            if any(word in text for word in delete_words): names = {"get_calendar", "delete_event"}
-            elif any(word in text for word in update_words): names = {"get_calendar", "update_event"}
-            elif (any(word in text for word in create_words)
-                  or any(marker in text for marker in ("有个", "有一场", "要开", "参加"))):
-                names = {"get_calendar", "create_event"}
-            else: names = {"get_calendar"}
+            names = {"get_calendar", "create_event", "update_event", "delete_event"}
         elif "任务" in text and any(marker in text for marker in ("重新打开", "恢复")):
             names = {"get_tasks", "reopen_task"}
         elif "保留逾期" in text:
