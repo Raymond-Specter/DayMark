@@ -7,16 +7,19 @@ export default function ModelSettingsDrawer({
   value,
   close,
   saved,
+  deepseekConfigured,
 }: {
   value: ModelSettings;
   close: () => void;
   saved: () => void;
+  deepseekConfigured: boolean;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState(value);
   const [models, setModels] = useState<{ name: string }[]>([]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [apiKey, setApiKey] = useState("");
   useEffect(() => {
     dialog.current?.showModal();
     aiRequest<{ name: string }[]>("/models")
@@ -28,6 +31,13 @@ export default function ModelSettingsDrawer({
     setBusy(true);
     setError("");
     try {
+      if (apiKey.trim()) {
+        await aiRequest("/providers/deepseek/key", {
+          method: "PUT",
+          body: JSON.stringify({ api_key: apiKey.trim() }),
+        });
+        setApiKey("");
+      }
       await aiRequest("/settings", {
         method: "PUT",
         body: JSON.stringify(draft),
@@ -58,6 +68,22 @@ export default function ModelSettingsDrawer({
           </button>
         </div>
         <p>设置保存在本机，下次对话自动沿用。每次仅生成一个回答。</p>
+        <div className="ai-key-panel">
+          <label>
+            DeepSeek API Key
+            <input
+              type="password"
+              value={apiKey}
+              autoComplete="off"
+              spellCheck={false}
+              placeholder={deepseekConfigured ? "已配置 · 输入新 Key 可替换" : "粘贴你的 DeepSeek API Key"}
+              onChange={(event) => setApiKey(event.target.value)}
+            />
+          </label>
+          <small className={deepseekConfigured ? "configured" : ""}>
+            {deepseekConfigured ? "✓ 已配置，仅保存在本机项目 .env" : "未配置。Key 不会显示在页面、数据库或聊天记录中。"}
+          </small>
+        </div>
         <label>
           AI Mode
           <select value={draft.mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as ModelSettings["mode"] })}>
@@ -136,7 +162,7 @@ export default function ModelSettingsDrawer({
           </p>
         )}
         <button className="button primary" disabled={busy}>
-          {busy ? "保存中…" : "保存设置"}
+          {busy ? "保存中…" : apiKey.trim() ? "保存 Key 与设置" : "保存设置"}
         </button>
       </form>
     </dialog>

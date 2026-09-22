@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import zipfile
+from types import SimpleNamespace
 
 import httpx
 import pytest
@@ -16,6 +17,7 @@ from app.services.attachments import extract_text
 from app.services.conversation import ConversationService, build_context
 from app.services.llm.base import ChatChunk, GenerationOptions, LLMError, Message
 from app.services.llm.config import LLMConfig
+from app.services.llm import config as llm_config
 from app.services.llm.ollama_provider import OllamaProvider
 from app.services.llm.service import LLMService
 from app.agent.permissions import ToolPermission
@@ -172,6 +174,29 @@ def test_settings_persist_and_missing_model(client, ai):
     assert client.get("/api/ai/settings").json() == {"mode": "auto", **payload}
     health = client.get("/api/ai/health").json()
     assert health["ollama_available"] and not health["model_available"]
+
+
+def test_deepseek_key_can_be_saved_without_echoing_secret(client, monkeypatch, tmp_path):
+    env_path = tmp_path / ".env"
+    env_path.write_text("OLLAMA_MODEL=qwen3:8b\nDEEPSEEK_API_KEY=old-secret\n", encoding="utf-8")
+    monkeypatch.setattr(llm_config, "ENV_PATH", env_path)
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "old-secret")
+
+    provider = SimpleNamespace(api_key="")
+    router = SimpleNamespace(config=LLMConfig(), deepseek=SimpleNamespace(provider=provider))
+    async def status(_model):
+        return {"deepseek": {"configured": True, "online": True, "model": "deepseek-flash", "error": None}}
+    router.status = status
+    service = SimpleNamespace(active=None, config=LLMConfig(), llm=router)
+    app.dependency_overrides[get_service] = lambda: service
+
+    secret = "sk-test-never-echo-this"
+    response = client.put("/api/ai/providers/deepseek/key", json={"api_key": secret})
+    assert response.status_code == 200
+    assert secret not in response.text
+    assert env_path.read_text(encoding="utf-8").count("DEEPSEEK_API_KEY=") == 1
+    assert f"DEEPSEEK_API_KEY={secret}" in env_path.read_text(encoding="utf-8")
+    assert provider.api_key == secret
 
 
 def test_stop_saves_partial_and_releases_single_slot(session_factory):

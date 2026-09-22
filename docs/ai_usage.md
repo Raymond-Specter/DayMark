@@ -2,6 +2,8 @@
 
 ## DeepSeek 配置
 
+最简单的方式是在 AI Assistant 右上角打开“模型设置”，在 `DeepSeek API Key` 密码框中粘贴 Key，然后点击“保存 Key 与设置”。后端会写入项目根目录 `.env` 并立即启用，页面不会回显 Key。
+
 复制 `.env.example` 中的 DeepSeek 字段到项目根目录 `.env`，只填写后端变量：
 
 ```dotenv

@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class AIInput(BaseModel):
@@ -11,6 +11,10 @@ class ModelSettings(AIInput):
     num_ctx: int = Field(default=8192, ge=2048, le=8192)
     temperature: float = Field(default=0.6, ge=0, le=2)
     think: bool = False
+
+
+class DeepSeekKeyIn(AIInput):
+    api_key: SecretStr = Field(min_length=8, max_length=500)
 
 
 class ConversationIn(AIInput):

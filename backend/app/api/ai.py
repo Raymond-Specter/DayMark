@@ -5,7 +5,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..ai_schemas import ChatIn, ConfirmationIn, ConversationIn, ModelSettings
+from ..ai_schemas import ChatIn, ConfirmationIn, ConversationIn, DeepSeekKeyIn, ModelSettings
 from ..database import SessionLocal, get_db
 from ..models import AISettings, AgentActionLog, ChatAttachment, Conversation
 from ..agent.agent_service import AgentService
@@ -16,7 +16,7 @@ from ..services.conversation import ConversationService, history, read_settings
 from ..services.attachments import (MAX_FILE_BYTES, attachment_dict, attachment_path,
                                     delete_upload, extract_text, safe_filename, save_upload)
 from ..services.llm.base import LLMError
-from ..services.llm.config import LLMConfig
+from ..services.llm.config import LLMConfig, save_env_secret
 from ..services.llm.ollama_provider import OllamaProvider
 from ..services.llm.deepseek_provider import DeepSeekProvider
 from ..services.llm.router import ProviderRouter
@@ -66,6 +66,22 @@ async def provider_status(db: Session = Depends(get_db), service=Depends(get_ser
     if not hasattr(service.llm, "status"):
         return {"selected_mode": selected.mode, "providers": {}}
     return {"selected_mode": selected.mode, "providers": await service.llm.status(selected.model)}
+
+
+@router.put("/providers/deepseek/key")
+async def save_deepseek_key(data: DeepSeekKeyIn, service=Depends(get_service)):
+    if service.active:
+        raise HTTPException(409, "请先停止生成再修改 API Key。")
+    key = data.api_key.get_secret_value().strip()
+    try:
+        save_env_secret("DEEPSEEK_API_KEY", key)
+    except (OSError, ValueError) as error:
+        raise HTTPException(500 if isinstance(error, OSError) else 422,
+                            "API Key 无法保存到项目 .env。" if isinstance(error, OSError) else str(error))
+    service.config.deepseek_api_key = key
+    service.llm.config.deepseek_api_key = key
+    service.llm.deepseek.provider.api_key = key
+    return {"configured": True, "model": service.config.deepseek_model}
 
 
 @router.get("/models")

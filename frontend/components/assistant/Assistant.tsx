@@ -428,7 +428,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
         <div className="ai-offline" role="status">
           <strong>{healthError || (mode === "deepseek" ? deepseek?.error : local?.error)}</strong>
           <span>
-            {mode === "deepseek" ? "请在后端 .env 中配置 DEEPSEEK_API_KEY 后重启服务。" : <>在项目目录运行 <code>.\scripts\setup_ollama.ps1 -Start</code>。</>}
+            {mode === "deepseek" ? "请打开“模型设置”，填写 DeepSeek API Key 后保存。" : <>在项目目录运行 <code>.\scripts\setup_ollama.ps1 -Start</code>。</>}
           </span>
           <button onClick={refreshHealth}>重新检查</button>
         </div>
@@ -782,6 +782,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       {settingsOpen && health && (
         <ModelSettingsDrawer
           value={health.settings}
+          deepseekConfigured={Boolean(health.providers?.deepseek.configured)}
           close={() => setSettingsOpen(false)}
           saved={refreshHealth}
         />

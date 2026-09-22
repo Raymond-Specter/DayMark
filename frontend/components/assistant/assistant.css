@@ -671,7 +671,8 @@
   margin: 24px 0 9px;
   font-size: 12px;
 }
-.ai-settings-drawer select {
+.ai-settings-drawer select,
+.ai-settings-drawer input[type="password"] {
   width: 100%;
   padding: 12px;
   border-radius: 9px;
@@ -679,6 +680,9 @@
   color: #5c6781;
   background: #fafbfe;
 }
+.ai-key-panel { padding: 2px 14px 13px; margin: 20px 0 4px; border: 1px solid #e8e9f4; border-radius: 13px; background: #fafaff; }
+.ai-key-panel label { margin-top: 14px; }
+.ai-key-panel small.configured { color: #3d9b79; }
 .ai-settings-drawer .primary {
   margin-top: 30px;
   width: 100%;

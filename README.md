@@ -60,7 +60,7 @@ Pop-Location
 
 默认 `Auto` 模式优先使用 DeepSeek Cloud 的 `deepseek-flash`，云端出现可恢复错误且尚未成功写入时安全降级到项目内 `qwen3:8b`。也可以固定选择 `DeepSeek` 或 `Local Qwen`。Agent、工具、业务 Service 和 SQLite 数据始终只有一套。
 
-把 `DEEPSEEK_API_KEY` 写入项目根目录 `.env` 后重启即可启用云端；Key 只由 FastAPI 后端读取，不会返回前端或保存进数据库。完整变量见 `.env.example`。
+可以在 AI Assistant 的“模型设置”中直接粘贴 DeepSeek API Key；后端会把它写入项目根目录 `.env` 并立即启用。也可以手动设置 `DEEPSEEK_API_KEY` 后重启。Key 不会被接口回显，也不会保存进数据库、聊天记录或 Git。完整变量见 `.env.example`。
 
 ```powershell
 # 首次显式安装项目内的 Ollama、启动服务并下载模型（需要数 GB 下载）

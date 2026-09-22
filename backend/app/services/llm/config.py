@@ -3,15 +3,42 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
 
+ENV_PATH = Path(__file__).resolve().parents[4] / ".env"
+
 
 def load_env():
     # Explicit KEY=VALUE only: never execute a .env file as a shell script.
-    path = Path(__file__).resolve().parents[4] / ".env"
+    path = ENV_PATH
     if path.exists():
         for line in path.read_text(encoding="utf-8-sig").splitlines():
             key, separator, value = line.strip().partition("=")
             if separator and key.startswith(("OLLAMA_", "DEEPSEEK_", "LLM_")):
                 os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
+
+
+def save_env_secret(name: str, value: str):
+    """Atomically update one secret without exposing it through return values."""
+    if name != "DEEPSEEK_API_KEY":
+        raise ValueError("不支持的密钥名称")
+    if not value or "\n" in value or "\r" in value:
+        raise ValueError("API Key 格式无效")
+    lines = ENV_PATH.read_text(encoding="utf-8-sig").splitlines() if ENV_PATH.exists() else []
+    updated, found = [], False
+    for line in lines:
+        key, separator, _ = line.partition("=")
+        if separator and key.strip() == name:
+            if not found:
+                updated.append(f"{name}={value}")
+                found = True
+            continue
+        updated.append(line)
+    if not found:
+        updated.append(f"{name}={value}")
+    ENV_PATH.parent.mkdir(parents=True, exist_ok=True)
+    temporary = ENV_PATH.with_suffix(".env.tmp")
+    temporary.write_text("\n".join(updated) + "\n", encoding="utf-8")
+    temporary.replace(ENV_PATH)
+    os.environ[name] = value
 
 
 def env_value(name, default):
