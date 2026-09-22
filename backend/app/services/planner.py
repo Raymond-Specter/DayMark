@@ -103,7 +103,8 @@ class PlannerService:
             fields.update(date=data.date, start_time=data.start_time if "start_time" in data.model_fields_set else task.start_time,
                           end_time=data.end_time if "end_time" in data.model_fields_set else task.end_time)
             checked = TaskIn(**fields)
-            values = {"date": checked.date, "start_time": checked.start_time, "end_time": checked.end_time, "status": "rescheduled"}
+            values = {"date": checked.date, "start_time": checked.start_time, "end_time": checked.end_time,
+                      "estimated_duration": checked.estimated_duration, "status": "rescheduled"}
         return self.mutate(task, values, data.version, data.action)
 
     def delete(self, task, version):

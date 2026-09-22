@@ -200,23 +200,35 @@ export default function Editor({
           project_id: str("project_id"),
           deadline: nullable("deadline"),
         };
-      else if (kind === "task")
-        payload = {
-          title: str("title"),
-          description: str("description"),
-          project_id: nullable("project_id"),
-          milestone_id: nullable("milestone_id"),
-          date: nullable("date"),
-          start_time: nullable("start_time"),
-          end_time: nullable("end_time"),
-          deadline: zonedISO(str("deadline"), data.settings.timezone),
-          estimated_duration: num("estimated_duration"),
-          priority: num("priority"),
-          reminder: str("reminder") === "" ? null : num("reminder"),
-          depends_on_task_id: nullable("depends_on_task_id"),
-          version: item ? num("version") : null,
-        };
-      else if (kind === "routine")
+      else if (kind === "task") {
+          const startTime = nullable("start_time");
+          const endTime = nullable("end_time");
+          if (Boolean(startTime) !== Boolean(endTime))
+            throw new Error("开始时间和结束时间需要同时填写");
+          let estimatedDuration = 0;
+          if (startTime && endTime) {
+            const [startHour, startMinute] = startTime.split(":").map(Number);
+            const [endHour, endMinute] = endTime.split(":").map(Number);
+            estimatedDuration = endHour * 60 + endMinute - startHour * 60 - startMinute;
+            if (estimatedDuration <= 0)
+              throw new Error("结束时间必须晚于开始时间");
+          }
+          payload = {
+            title: str("title"),
+            description: str("description"),
+            project_id: nullable("project_id"),
+            milestone_id: nullable("milestone_id"),
+            date: nullable("date"),
+            start_time: startTime,
+            end_time: endTime,
+            deadline: zonedISO(str("deadline"), data.settings.timezone),
+            estimated_duration: estimatedDuration,
+            priority: num("priority"),
+            reminder: str("reminder") === "" ? null : num("reminder"),
+            depends_on_task_id: nullable("depends_on_task_id"),
+            version: item ? num("version") : null,
+          };
+      } else if (kind === "routine")
         payload = {
           name: str("name"),
           description: str("description"),
@@ -415,16 +427,7 @@ export default function Editor({
                 <Clock3 size={15} /> 时间安排{" "}
                 <span>{data.settings.timezone}</span>
               </div>
-              <div className="form-grid">
-                {field("date", "计划日期", "date")}
-                {field(
-                  "estimated_duration",
-                  "预计用时（分钟）",
-                  "number",
-                  true,
-                  { min: 0, max: 1440 },
-                )}
-              </div>
+              {field("date", "计划日期", "date")}
               <div className="form-grid">
                 {field("start_time", "开始时间", "time")}
                 {field("end_time", "结束时间", "time")}
@@ -451,7 +454,7 @@ export default function Editor({
                 ])}
               </div>
               <p className="form-hint">
-                未设置开始时间时，按每日默认开始时间提醒。依赖未完成的任务会显示等待状态。
+                预计用时会根据开始时间和结束时间自动计算。未设置时间时，按每日默认开始时间提醒。依赖未完成的任务会显示等待状态。
               </p>
               {item && (
                 <div className="record-meta">

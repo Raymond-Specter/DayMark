@@ -67,7 +67,8 @@ def test_missing_foreign_keys_return_not_found(client):
 
 
 def test_task_completion_reopening_and_stale_versions(client, create, action):
-    task = create("tasks", title="Read", date=DAY, start_time="13:00", end_time="14:00")
+    task = create("tasks", title="Read", date=DAY, start_time="13:00", end_time="14:00", estimated_duration=5)
+    assert task["estimated_duration"] == 60
     done = action(task, "complete")
     assert done["status"] == "completed" and done["completed_at"] == "2026-09-21T04:00:00+00:00"
     assert done["version"] == task["version"] + 1
@@ -83,11 +84,12 @@ def test_task_completion_reopening_and_stale_versions(client, create, action):
 def test_task_edit_requires_version_and_preserves_calendar_identity(client, create):
     task = create("tasks", title="First", date=DAY, start_time="13:00", end_time="14:00")
     original = client.get(f"/api/calendar?start={DAY}&end=2026-09-23").json()[0]
-    payload = {"title": "Moved", "date": "2026-09-22", "start_time": "15:00", "end_time": "16:00"}
+    payload = {"title": "Moved", "date": "2026-09-22", "start_time": "15:00", "end_time": "16:30"}
     assert client.put(f"/api/tasks/{task['id']}", json=payload).status_code == 422
     changed = client.put(f"/api/tasks/{task['id']}", json={**payload, "version": task["version"]})
     assert changed.status_code == 200
     assert changed.json()["status"] == "rescheduled"
+    assert changed.json()["estimated_duration"] == 90
     events = client.get(f"/api/calendar?start={DAY}&end=2026-09-23").json()
     assert len(events) == 1 and events[0]["id"] == original["id"]
     assert events[0]["start"] == "2026-09-22T15:00:00"
@@ -106,8 +108,9 @@ def test_carryover_is_explicit_and_reschedule_keeps_history(client, create, acti
     assert client.get(f"/api/tasks/{yesterday['id']}").json()["date"] == "2026-09-20"
     kept = action(older, "keep_overdue")
     assert kept["status"] == "overdue" and kept["date"] == older["date"]
-    moved = action(yesterday, "reschedule", date=DAY)
-    assert moved["status"] == "rescheduled" and moved["start_time"] == "09:00"
+    moved = action(yesterday, "reschedule", date=DAY, start_time="10:00", end_time="11:30")
+    assert moved["status"] == "rescheduled" and moved["start_time"] == "10:00"
+    assert moved["estimated_duration"] == 90
     history = client.get(f"/api/tasks/{yesterday['id']}/history").json()
     record = next(h for h in history if h["action"] == "reschedule")
     assert record["before"]["date"] == "2026-09-20" and record["after"]["date"] == DAY

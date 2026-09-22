@@ -92,7 +92,11 @@ class TaskIn(Input):
             raise ValueError("设置时间前必须选择日期")
         if self.end_time and (not self.start_time or self.end_time <= self.start_time):
             raise ValueError("结束时间必须晚于开始时间；跨天请拆成两个任务")
-        if self.start_time and not self.end_time:
+        if self.start_time and self.end_time:
+            start_hour, start_minute = map(int, self.start_time.split(":"))
+            end_hour, end_minute = map(int, self.end_time.split(":"))
+            self.estimated_duration = end_hour * 60 + end_minute - start_hour * 60 - start_minute
+        elif self.start_time:
             h, m = map(int, self.start_time.split(":"))
             if h * 60 + m + max(15, self.estimated_duration) >= 1440:
                 raise ValueError("自动计算的结束时间超过当天，请调整开始时间或时长")
