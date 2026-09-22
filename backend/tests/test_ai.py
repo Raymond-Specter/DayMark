@@ -130,6 +130,23 @@ def test_scanned_pdf_falls_back_to_local_ocr(monkeypatch):
     assert attachment_service._extract_pdf(b"scanned-pdf") == "OCR schedule Monday 09:00"
 
 
+def test_timetable_ocr_rebuilds_weekday_columns():
+    def word(text, left, top, block, line):
+        return {"text": text, "left": left, "top": top, "width": 40, "height": 30,
+                "block": block, "paragraph": 1, "line": line, "confidence": 95}
+
+    page = {"width": 1000, "height": 1000, "words": [
+        word("星期一", 180, 100, 1, 1), word("星期二", 280, 100, 1, 1),
+        word("星期三", 380, 100, 1, 1), word("项目", 175, 300, 2, 1),
+        word("管理", 220, 300, 2, 1), word("算法与编程", 280, 400, 3, 1),
+        word("工程化学", 380, 500, 4, 1),
+    ]}
+    text = attachment_service._format_ocr_pages([page])
+    assert "[星期一]" in text and "项目管理" in text
+    assert text.index("项目管理") < text.index("[星期二]") < text.index("算法与编程")
+    assert text.index("算法与编程") < text.index("[星期三]") < text.index("工程化学")
+
+
 def test_multiturn_system_once(client, ai):
     key = conversation(client)
     for text in ["今晚学托福", "明早有考试"]:

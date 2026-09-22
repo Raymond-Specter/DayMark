@@ -5,8 +5,9 @@ $ErrorActionPreference = 'Stop'
 $workspace = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $modelDir = Join-Path $workspace 'models\tesseract'
 $files = @{
-    'chi_sim.traineddata' = @('https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/chi_sim.traineddata', 'a5fcb6f0db1e1d6d8522f39db4e848f05984669172e584e8d76b6b3141e1f730')
-    'eng.traineddata' = @('https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/eng.traineddata', '7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2')
+    'chi_sim.traineddata' = @('https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/chi_sim.traineddata', '4fef2d1306c8e87616d4d3e4c6c67faf5d44be3342290cf8f2f0f6e3aa7e735b')
+    'chi_sim_vert.traineddata' = @('https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/chi_sim_vert.traineddata', 'ea672a78157199c333aa12ec4e74550077689b545df5fc770903716850c8b2e5')
+    'eng.traineddata' = @('https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/main/eng.traineddata', '8280aed0782fe27257a68ea10fe7ef324ca0f8d85bd2fd145d1c2b560bcb66ba')
 }
 New-Item -ItemType Directory -Path $modelDir -Force | Out-Null
 $curl = (Get-Command curl.exe -ErrorAction Stop).Source

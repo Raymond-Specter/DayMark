@@ -1,10 +1,13 @@
+import csv
 import io
 import os
+import re
 import shutil
 import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
+from statistics import median
 from uuid import uuid4
 from xml.etree import ElementTree
 
@@ -96,25 +99,152 @@ def _ocr_pdf(source: Path, directory: Path):
         raise HTTPException(415, "扫描版 PDF 需要本地 OCR 组件。请运行 scripts/setup_ocr.ps1 后重试。")
     prefix = directory / "ocr-page"
     rendered = subprocess.run(
-        [renderer, "-f", "1", "-l", "20", "-r", "220", "-png", str(source), str(prefix)],
-        capture_output=True, timeout=90, check=False,
+        [renderer, "-f", "1", "-l", "20", "-r", "300", "-png", str(source), str(prefix)],
+        capture_output=True, timeout=120, check=False,
     )
     pages = sorted(directory.glob("ocr-page-*.png"))
     if rendered.returncode or not pages:
         raise HTTPException(422, "无法将扫描版 PDF 转换为图片，文件可能已损坏或加密。")
-    texts = []
-    for page in pages:
+    page_data = []
+    for index, page in enumerate(pages, start=1):
+        output = directory / f"ocr-result-{index}"
         result = subprocess.run(
-            [tesseract, str(page), "stdout", "--tessdata-dir", str(OCR_MODEL_DIR),
-             "-l", "+".join(languages), "--psm", "6"],
-            capture_output=True, timeout=45, check=False,
+            [tesseract, str(page), str(output), "--tessdata-dir", str(OCR_MODEL_DIR),
+             "-l", "+".join(languages), "--psm", "3",
+             "-c", "preserve_interword_spaces=1", "-c", "tessedit_create_tsv=1"],
+            capture_output=True, timeout=60, check=False,
         )
-        if not result.returncode:
-            texts.append(result.stdout.decode("utf-8", errors="replace"))
-    text = "\n\n".join(texts).strip()
+        tsv = output.with_suffix(".tsv")
+        if not result.returncode and tsv.is_file():
+            parsed = _read_ocr_tsv(tsv)
+            if parsed["words"]:
+                page_data.append(parsed)
+    text = _format_ocr_pages(page_data).strip()
     if not text:
         raise HTTPException(422, "OCR 没有识别出文字，请确认扫描清晰度或改用更清晰的 PDF。")
-    return "[以下文字由 OCR 识别，导入前必须仔细核对]\n" + text
+    return ("[以下文字由本地 OCR 识别；已尽量保留页面与课表列结构，导入前仍须核对]\n" + text)
+
+
+def _read_ocr_tsv(path: Path):
+    words, width, height = [], 0, 0
+    with path.open(encoding="utf-8-sig", newline="") as stream:
+        for row in csv.DictReader(stream, delimiter="\t"):
+            try:
+                level = int(row.get("level") or 0)
+                if level == 1:
+                    width, height = int(row["width"]), int(row["height"])
+                text = (row.get("text") or "").strip()
+                if level != 5 or not text:
+                    continue
+                words.append({
+                    "text": text, "left": int(row["left"]), "top": int(row["top"]),
+                    "width": int(row["width"]), "height": int(row["height"]),
+                    "block": int(row["block_num"]), "paragraph": int(row["par_num"]),
+                    "line": int(row["line_num"]), "confidence": float(row.get("conf") or -1),
+                })
+            except (KeyError, TypeError, ValueError):
+                continue
+    return {"width": width, "height": height, "words": words}
+
+
+def _weekday_layout(page):
+    labels = "一二三四五六日"
+    candidates = {}
+    words = page["words"]
+    for word in words:
+        compact = re.sub(r"\s+", "", word["text"])
+        match = re.search(r"星期([一二三四五六日天])", compact)
+        label = match.group(1) if match else None
+        center = word["left"] + word["width"] / 2
+        bottom = word["top"] + word["height"]
+        if compact == "星期":
+            nearby = [item for item in words if item is not word
+                      and abs(item["top"] - word["top"]) <= max(20, word["height"])
+                      and 0 <= item["left"] - (word["left"] + word["width"]) <= 80
+                      and item["text"] in labels + "天"]
+            if nearby:
+                suffix = min(nearby, key=lambda item: item["left"])
+                label = suffix["text"]
+                center = (word["left"] + suffix["left"] + suffix["width"]) / 2
+                bottom = max(bottom, suffix["top"] + suffix["height"])
+        if label:
+            index = 6 if label == "天" else labels.index(label)
+            candidates[index] = (center, bottom)
+    if len(candidates) < 3:
+        return None
+    spacings = [(candidates[b][0] - candidates[a][0]) / (b - a)
+                for a in candidates for b in candidates if b > a]
+    spacing = median(spacings)
+    if spacing <= 0 or spacing < page["width"] * .06 or spacing > page["width"] * .25:
+        return None
+    origin = median(center - index * spacing for index, (center, _) in candidates.items())
+    centers = [origin + index * spacing for index in range(7)]
+    bounds = [centers[0] - spacing / 2] + [(centers[i] + centers[i + 1]) / 2 for i in range(6)] + [centers[-1] + spacing / 2]
+    return {"centers": centers, "bounds": bounds,
+            "header_bottom": max(bottom for _, bottom in candidates.values())}
+
+
+def _join_ocr_words(words):
+    result, previous = "", None
+    for word in sorted(words, key=lambda item: item["left"]):
+        if previous is not None:
+            gap = word["left"] - (previous["left"] + previous["width"])
+            if gap > max(8, min(previous["height"], word["height"]) * .45):
+                result += " "
+        result += word["text"]
+        previous = word
+    result = re.sub(r"(?<=[\u3400-\u9fff])\s+(?=[\u3400-\u9fff])", "", result)
+    return result.strip()
+
+
+def _ocr_lines(words, page_height, include_position=True):
+    groups = {}
+    for word in words:
+        key = (word["block"], word["paragraph"], word["line"])
+        groups.setdefault(key, []).append(word)
+    lines = []
+    for group in groups.values():
+        text = _join_ocr_words(group)
+        if text:
+            top = min(word["top"] for word in group)
+            rendered = f"位置 {top * 100 / max(page_height, 1):05.1f}% | {text}" if include_position else text
+            lines.append((top, rendered))
+    return [text for _, text in sorted(lines)]
+
+
+def _format_ocr_pages(pages):
+    if not pages:
+        return ""
+    layout = None
+    for page in pages:
+        layout = _weekday_layout(page)
+        if layout:
+            break
+    output = []
+    if not layout:
+        for index, page in enumerate(pages, start=1):
+            output.append(f"\n===== 第 {index} 页 =====")
+            output.extend(_ocr_lines(page["words"], page["height"], include_position=False))
+        return "\n".join(output)
+    labels = "一二三四五六日"
+    for page_index, page in enumerate(pages, start=1):
+        current = _weekday_layout(page)
+        active = current or layout
+        header_bottom = current["header_bottom"] if current else 0
+        output.append(f"\n===== 第 {page_index} 页：课表坐标重建 =====")
+        left_words = [word for word in page["words"]
+                      if word["top"] >= header_bottom and word["left"] + word["width"] / 2 < active["bounds"][0]]
+        if left_words:
+            output.append("[时间段与节次]")
+            output.extend(_ocr_lines(left_words, page["height"]))
+        for day_index, label in enumerate(labels):
+            column = [word for word in page["words"] if word["top"] >= header_bottom
+                      and active["bounds"][day_index] <= word["left"] + word["width"] / 2 < active["bounds"][day_index + 1]]
+            lines = _ocr_lines(column, page["height"])
+            if lines:
+                output.append(f"[星期{label}]")
+                output.extend(lines)
+    return "\n".join(output)
 
 
 def _miktex_binary(name):
