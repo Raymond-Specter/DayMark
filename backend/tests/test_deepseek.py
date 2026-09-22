@@ -36,6 +36,9 @@ def test_deepseek_streaming_tools_and_reasoning_round_trip():
         followup = Message("assistant", "", result.tool_calls, reasoning_content=result.reasoning_content)
         await provider.chat([Message("user", "安排 A"), followup], GenerationOptions(think=True), [])
         assert requests[1]["messages"][1]["reasoning_content"] == "private thought"
+        serialized = requests[1]["messages"][1]["tool_calls"][0]["function"]["arguments"]
+        assert isinstance(serialized, str)
+        assert json.loads(serialized) == {"title": "A"}
     asyncio.run(run())
 
 

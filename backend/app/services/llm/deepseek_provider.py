@@ -45,7 +45,20 @@ class DeepSeekProvider:
     def _message(message: Message):
         data = {"role": message.role, "content": message.content}
         if message.tool_calls:
-            data["tool_calls"] = message.tool_calls
+            tool_calls = []
+            for call in message.tool_calls:
+                normalized = dict(call)
+                function = dict(call.get("function") or {})
+                arguments = function.get("arguments")
+                if not isinstance(arguments, str):
+                    function["arguments"] = json.dumps(
+                        arguments if arguments is not None else {},
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                    )
+                normalized["function"] = function
+                tool_calls.append(normalized)
+            data["tool_calls"] = tool_calls
         if message.tool_call_id:
             data["tool_call_id"] = message.tool_call_id
         if message.role == "assistant" and message.reasoning_content is not None:
