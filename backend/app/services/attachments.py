@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import tempfile
 import zipfile
+import zlib
 from pathlib import Path
 from statistics import median
 from uuid import uuid4
@@ -50,7 +51,7 @@ def extract_text(filename: str, content: bytes, max_chars=MAX_EXTRACTED_CHARS):
         raise HTTPException(422, "无法读取文件内容，请确认文件没有损坏或加密。") from error
     text = text.replace("\x00", "").strip()
     if not text:
-        raise HTTPException(422, "文件中没有可读取的文字；扫描版 PDF 暂不支持 OCR。")
+        raise HTTPException(422, "文件中没有识别到可读取的文字，请确认文件清晰且没有损坏或加密。")
     return text[:max_chars]
 
 
@@ -79,6 +80,9 @@ def _extract_pdf(content: bytes):
                 extracted = target.read_text(encoding="utf-8", errors="replace").strip()
         if len(extracted) >= 80:
             return extracted
+        embedded = _extract_unigb_pdf(content)
+        if len(embedded) >= 80:
+            return embedded
         try:
             ocr_text = _ocr_pdf(source, Path(directory))
             return ocr_text if len(ocr_text) > len(extracted) else extracted
@@ -86,6 +90,144 @@ def _extract_pdf(content: bytes):
             if extracted:
                 return extracted
             raise
+
+
+def _pdf_literal_bytes(value):
+    result = bytearray()
+    index, depth = 1, 1
+    escapes = {ord("n"): 10, ord("r"): 13, ord("t"): 9, ord("b"): 8, ord("f"): 12}
+    while index < len(value) and depth:
+        current = value[index]
+        if current == 92:  # PDF string escape: backslash
+            index += 1
+            if index >= len(value):
+                break
+            escaped = value[index]
+            if escaped in escapes:
+                result.append(escapes[escaped])
+            elif escaped in (40, 41, 92):
+                result.append(escaped)
+            elif escaped in (10, 13):
+                if escaped == 13 and index + 1 < len(value) and value[index + 1] == 10:
+                    index += 1
+            elif 48 <= escaped <= 55:
+                digits = bytes([escaped])
+                for _ in range(2):
+                    if index + 1 < len(value) and 48 <= value[index + 1] <= 55:
+                        index += 1
+                        digits += bytes([value[index]])
+                    else:
+                        break
+                result.append(int(digits, 8))
+            else:
+                result.append(escaped)
+        elif current == 40:
+            depth += 1
+            result.append(current)
+        elif current == 41:
+            depth -= 1
+            if depth:
+                result.append(current)
+        else:
+            result.append(current)
+        index += 1
+    return bytes(result)
+
+
+def _unigb_page(stream):
+    items, x, y = [], 0.0, 0.0
+    matrix = re.compile(rb"1\s+0\s+0\s+1\s+(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)\s+Tm")
+    for line in stream.splitlines():
+        match = matrix.fullmatch(line.strip())
+        if match:
+            x, y = float(match.group(1)), float(match.group(2))
+            continue
+        stripped = line.strip()
+        if not stripped.startswith(b"(") or not stripped.endswith(b")Tj"):
+            continue
+        raw = _pdf_literal_bytes(stripped[:-2])
+        if not raw or len(raw) % 2:
+            continue
+        try:
+            text = raw.decode("utf-16-be").replace("\x00", "").strip()
+        except UnicodeDecodeError:
+            continue
+        if text:
+            items.append({"x": x, "y": y, "text": text})
+    return items
+
+
+def _format_unigb_pages(pages):
+    labels = "一二三四五六日"
+    header_page = next((page for page in pages if sum(item["text"] in {f"星期{x}" for x in labels}
+                                                       for item in page) >= 3), None)
+    if not header_page:
+        return ""
+    headers = {labels.index(item["text"][-1]): (item["x"], item["y"])
+               for item in header_page if item["text"] in {f"星期{x}" for x in labels}}
+    spacings = [(headers[b][0] - headers[a][0]) / (b - a)
+                for a in headers for b in headers if b > a]
+    if not spacings:
+        return ""
+    spacing = median(spacings)
+    origin = median(x - index * spacing for index, (x, _) in headers.items())
+    bounds = [origin - spacing / 2] + [origin + (index + .5) * spacing for index in range(6)] + [origin + 6.5 * spacing]
+    columns = [[] for _ in labels]
+    for page in pages:
+        page_headers = [item for item in page if item["text"] in {f"星期{x}" for x in labels}]
+        header_y = median(item["y"] for item in page_headers) if page_headers else None
+        body = [item for item in page if header_y is None or item["y"] < header_y]
+        for index in range(len(labels)):
+            column = [item for item in body if bounds[index] <= item["x"] < bounds[index + 1]]
+            if column:
+                groups = []
+                for item in sorted(column, key=lambda row: -row["y"]):
+                    if not groups or groups[-1][-1]["y"] - item["y"] > 14:
+                        groups.append([])
+                    groups[-1].append(item)
+                entries = []
+                for group in groups:
+                    entry = ""
+                    for item in group:
+                        value = item["text"]
+                        if entry and re.search(r"[A-Za-z0-9]$", entry) and re.match(r"[A-Za-z]", value):
+                            entry += " "
+                        entry += value
+                    entries.append(entry)
+                if columns[index] and entries and entries[0].startswith("("):
+                    columns[index][-1] += entries.pop(0)
+                columns[index].extend(entries)
+    output = ["[PDF 内嵌文字已直接解码；以下内容不是 OCR 猜测]"]
+    for index, label in enumerate(labels):
+        entries = [entry for entry in columns[index] if not entry.startswith("打印时间:")]
+        if entries:
+            output.append(f"\n[星期{label}]")
+            output.extend(f"- {entry}" for entry in entries)
+    return "\n".join(output)
+
+
+def _extract_unigb_pdf(content):
+    if b"/UniGB-UCS2-H" not in content or b"/Encrypt" in content:
+        return ""
+    pages = []
+    for match in re.finditer(rb"\b\d+\s+\d+\s+obj\b(.*?)endobj", content, re.DOTALL):
+        body = match.group(1)
+        if b"/FlateDecode" not in body or b"stream" not in body:
+            continue
+        compressed = body.split(b"stream", 1)[1].split(b"endstream", 1)[0]
+        compressed = compressed[2:] if compressed.startswith(b"\r\n") else compressed[1:] if compressed.startswith(b"\n") else compressed
+        compressed = compressed[:-2] if compressed.endswith(b"\r\n") else compressed[:-1] if compressed.endswith(b"\n") else compressed
+        try:
+            decoder = zlib.decompressobj()
+            decoded = decoder.decompress(compressed, 5_000_000)
+            if decoder.unconsumed_tail:
+                continue
+        except zlib.error:
+            continue
+        page = _unigb_page(decoded)
+        if page:
+            pages.append(page)
+    return _format_unigb_pages(pages)
 
 
 def _ocr_pdf(source: Path, directory: Path):

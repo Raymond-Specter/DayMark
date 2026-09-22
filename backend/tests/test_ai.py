@@ -1,5 +1,6 @@
 import asyncio
 import io
+import zlib
 import json
 import zipfile
 from types import SimpleNamespace
@@ -128,6 +129,30 @@ def test_scanned_pdf_falls_back_to_local_ocr(monkeypatch):
     monkeypatch.setattr(attachment_service, "_find_command", lambda *_: None)
     monkeypatch.setattr(attachment_service, "_ocr_pdf", lambda *_: "OCR schedule Monday 09:00")
     assert attachment_service._extract_pdf(b"scanned-pdf") == "OCR schedule Monday 09:00"
+
+
+def test_unigb_pdf_text_layer_is_decoded_without_ocr():
+    def literal(text):
+        return (text.encode("utf-16-be").replace(b"\\", b"\\\\")
+                .replace(b"(", b"\\(").replace(b")", b"\\)"))
+
+    lines = []
+    for x, y, text in [(100, 500, "星期一"), (200, 500, "星期二"), (300, 500, "星期三"),
+                       (100, 450, "项目管理(23005512)"),
+                       (100, 437, "(1-2节)1-16周/校区:宝山主"),
+                       (100, 424, "区/场地:AJ103/教师:Antoine"),
+                       (100, 411, "JOUGLET/学分:6.0"),
+                       (100, 380, "算法与编程(23305503)")]:
+        lines.append(f"1 0 0 1 {x} {y} Tm".encode())
+        lines.append(b"(" + literal(text) + b")Tj")
+    stream = zlib.compress(b"\n".join(lines))
+    pdf = (b"%PDF-1.4\n/Encoding/UniGB-UCS2-H\n1 0 obj<</Filter/FlateDecode>>stream\n"
+           + stream + b"\nendstream\nendobj\n%%EOF")
+    text = attachment_service._extract_unigb_pdf(pdf)
+    assert "[PDF 内嵌文字已直接解码" in text
+    assert "[星期一]" in text
+    assert "- 项目管理(23005512)(1-2节)1-16周/校区:宝山主区/场地:AJ103/教师:Antoine JOUGLET/学分:6.0" in text
+    assert "- 算法与编程(23305503)" in text
 
 
 def test_timetable_ocr_rebuilds_weekday_columns():
