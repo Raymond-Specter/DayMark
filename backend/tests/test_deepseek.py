@@ -48,6 +48,18 @@ def test_deepseek_missing_key_is_explicit():
     asyncio.run(run())
 
 
+def test_deepseek_client_honors_system_proxy(monkeypatch):
+    options = {}
+
+    class Client:
+        def __init__(self, **kwargs):
+            options.update(kwargs)
+
+    monkeypatch.setattr("app.services.llm.deepseek_provider.httpx.AsyncClient", Client)
+    DeepSeekProvider("https://api.deepseek.com", "secret").client()
+    assert options["trust_env"] is True
+
+
 def test_auto_fallback_only_before_write():
     class Broken:
         async def stream_chat(self, *_args, **_kwargs):

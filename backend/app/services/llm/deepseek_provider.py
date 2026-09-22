@@ -20,7 +20,10 @@ class DeepSeekProvider:
             base_url=self.base_url,
             headers={"Authorization": f"Bearer {self.api_key}"},
             timeout=httpx.Timeout(timeout, connect=10),
-            trust_env=False,
+            # Windows users commonly reach cloud APIs through the system proxy.
+            # httpx discovers that proxy through the environment/registry only
+            # when trust_env is enabled; TLS verification remains enabled.
+            trust_env=True,
             transport=self.transport,
         )
 
