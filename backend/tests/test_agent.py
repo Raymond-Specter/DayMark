@@ -2,7 +2,7 @@ import asyncio
 
 from sqlalchemy import select
 
-from app.agent.agent_service import AgentService
+from app.agent.agent_service import AgentService, MANUAL
 from app.agent.registry import build_registry
 from app.agent.tool_executor import ToolExecutor
 from app.models import AgentActionLog, CalendarEvent, Conversation, Routine, Task
@@ -23,6 +23,17 @@ class ScriptedProvider:
 def executor(session_factory):
     registry = build_registry()
     return registry, ToolExecutor(registry, session_factory)
+
+
+def test_agent_manual_is_loaded_and_documents_every_tool(session_factory):
+    registry, tool_executor = executor(session_factory)
+    for name in registry.definitions:
+        assert f"`{name}`" in MANUAL
+    agent = AgentService(None, registry, tool_executor, session_factory)
+    with session_factory() as db:
+        prompt = agent.system_prompt(db)
+    assert "# DayMark Agent 功能与使用手册" in prompt
+    assert "Task 的预计用时等于结束时间减开始时间" in prompt
 
 
 def test_minimum_agent_loop_creates_real_task_and_reads_it(session_factory):

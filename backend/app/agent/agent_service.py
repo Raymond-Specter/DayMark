@@ -9,7 +9,9 @@ from ..services.common import local_now, settings
 from ..services.llm.base import LLMError, Message
 from .schemas import AgentOutcome
 
-PROMPT = (Path(__file__).resolve().parents[1] / "prompts/agent_system_prompt.txt").read_text(encoding="utf-8")
+PROMPT_DIR = Path(__file__).resolve().parents[1] / "prompts"
+PROMPT = (PROMPT_DIR / "agent_system_prompt.txt").read_text(encoding="utf-8")
+MANUAL = (PROMPT_DIR / "agent_manual.md").read_text(encoding="utf-8")
 
 
 class AgentService:
@@ -19,8 +21,9 @@ class AgentService:
 
     def system_prompt(self, db):
         current = local_now(db)
-        return PROMPT.format(current_datetime=current.strftime("%Y-%m-%d %H:%M:%S"),
-                             timezone=settings(db).timezone)
+        prompt = PROMPT.format(current_datetime=current.strftime("%Y-%m-%d %H:%M:%S"),
+                               timezone=settings(db).timezone)
+        return f"{prompt}\n\n{MANUAL}"
 
     def system_prompt_for_conversation(self, db, conversation_id):
         prompt = self.system_prompt(db)
