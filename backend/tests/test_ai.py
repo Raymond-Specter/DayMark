@@ -169,7 +169,7 @@ def test_invalid_settings(client, ai, payload):
 def test_settings_persist_and_missing_model(client, ai):
     payload = {"model": "missing:8b", "num_ctx": 4096, "temperature": 0.8, "think": True}
     assert client.put("/api/ai/settings", json=payload).status_code == 200
-    assert client.get("/api/ai/settings").json() == payload
+    assert client.get("/api/ai/settings").json() == {"mode": "auto", **payload}
     health = client.get("/api/ai/health").json()
     assert health["ollama_available"] and not health["model_available"]
 
@@ -213,7 +213,7 @@ def test_immediate_stop_releases_slot(session_factory):
     asyncio.run(run())
 
 
-def test_provider_stream_discards_thinking_and_sends_options():
+def test_provider_keeps_thinking_internal_and_sends_options():
     async def run():
         def handler(request):
             payload = json.loads(request.content)
@@ -221,7 +221,8 @@ def test_provider_stream_discards_thinking_and_sends_options():
             return httpx.Response(200, content='{"message":{"thinking":"PRIVATE","content":"你好"},"done":false}\n{"message":{"content":"！"},"done":true}\n')
         provider = OllamaProvider("http://127.0.0.1:11434", httpx.MockTransport(handler))
         response = await provider.chat([Message("user", "hi")], GenerationOptions())
-        assert response.content == "你好！" and "PRIVATE" not in str(response)
+        assert response.content == "你好！" and "PRIVATE" not in response.content
+        assert response.reasoning_content == "PRIVATE"
     asyncio.run(run())
 
 

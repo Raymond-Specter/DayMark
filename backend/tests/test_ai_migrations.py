@@ -18,6 +18,6 @@ def test_upgrade_preserves_existing_planning_data(tmp_path):
     subprocess.run([*command, "check"], cwd=root, env=env, check=True, capture_output=True)
     with sqlite3.connect(database) as db:
         assert db.execute("SELECT name,description FROM goals").fetchone() == ("保留的目标", "原有数据")
-        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0005"
+        assert db.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0006"
         assert "position" in [row[1] for row in db.execute("PRAGMA table_info(chat_messages)")]
         assert "message_id" in [row[1] for row in db.execute("PRAGMA table_info(chat_attachments)")]

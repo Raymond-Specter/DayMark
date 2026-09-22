@@ -45,7 +45,7 @@ export default function ModelSettingsDrawer({
       <form onSubmit={save}>
         <div className="ai-drawer-heading">
           <div>
-            <span className="eyebrow">LOCAL MODEL</span>
+            <span className="eyebrow">AI PROVIDERS</span>
             <h2>模型设置</h2>
           </div>
           <button
@@ -59,7 +59,15 @@ export default function ModelSettingsDrawer({
         </div>
         <p>设置保存在本机，下次对话自动沿用。每次仅生成一个回答。</p>
         <label>
-          Model
+          AI Mode
+          <select value={draft.mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as ModelSettings["mode"] })}>
+            <option value="auto">Auto · DeepSeek 优先，安全时本地降级</option>
+            <option value="deepseek">DeepSeek · 仅云端</option>
+            <option value="local">Local Qwen · 仅本地</option>
+          </select>
+        </label>
+        <label>
+          Local Model
           <select
             value={draft.model}
             onChange={(e) => setDraft({ ...draft, model: e.target.value })}

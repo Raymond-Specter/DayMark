@@ -18,7 +18,8 @@ from ..services.attachments import (MAX_FILE_BYTES, attachment_dict, attachment_
 from ..services.llm.base import LLMError
 from ..services.llm.config import LLMConfig
 from ..services.llm.ollama_provider import OllamaProvider
-from ..services.llm.service import LLMService
+from ..services.llm.deepseek_provider import DeepSeekProvider
+from ..services.llm.router import ProviderRouter
 
 router = APIRouter(prefix="/api/ai", tags=["AI Assistant"])
 
@@ -30,11 +31,14 @@ def service_instance():
         config = LLMConfig.from_env()
     except ValueError as error:
         raise HTTPException(503, f"AI 配置无效：{error}")
-    llm = LLMService(OllamaProvider(config.base_url))
+    router_service = ProviderRouter(
+        DeepSeekProvider(config.deepseek_base_url, config.deepseek_api_key, config.deepseek_model),
+        OllamaProvider(config.base_url), config,
+    )
     registry = build_registry()
     executor = ToolExecutor(registry, SessionLocal)
-    agent = AgentService(llm, registry, executor, SessionLocal)
-    return ConversationService(llm, config, agent)
+    agent = AgentService(router_service, registry, executor, SessionLocal)
+    return ConversationService(router_service, config, agent)
 
 
 async def get_service():
@@ -45,14 +49,30 @@ async def get_service():
 @router.get("/health")
 async def health(db: Session = Depends(get_db), service=Depends(get_service)):
     selected = read_settings(db, service.config)
+    if hasattr(service.llm, "status"):
+        providers = await service.llm.status(selected.model)
+        local = providers["local"]
+        return {"providers": providers, "selected_mode": selected.mode,
+                "ollama_available": local["online"], "model_available": local.get("model_available", False),
+                "model": selected.model, "error": local.get("error"), "busy": service.active is not None,
+                "agent_enabled": service.agent is not None, "settings": selected.model_dump()}
     return {**await service.llm.health(selected.model), "busy": service.active is not None,
             "agent_enabled": service.agent is not None, "settings": selected.model_dump()}
+
+
+@router.get("/providers/status")
+async def provider_status(db: Session = Depends(get_db), service=Depends(get_service)):
+    selected = read_settings(db, service.config)
+    if not hasattr(service.llm, "status"):
+        return {"selected_mode": selected.mode, "providers": {}}
+    return {"selected_mode": selected.mode, "providers": await service.llm.status(selected.model)}
 
 
 @router.get("/models")
 async def models(service=Depends(get_service)):
     try:
-        return await service.llm.list_models()
+        llm = service.llm.local if hasattr(service.llm, "local") else service.llm
+        return await llm.list_models()
     except LLMError as error:
         raise HTTPException(error.status, error.message)
 
@@ -67,12 +87,12 @@ async def save_settings(data: ModelSettings, db: Session = Depends(get_db), serv
     if service.active:
         raise HTTPException(409, "请先停止生成再修改模型设置。")
     if data.model.endswith(":cloud") or "cloud" in data.model.split(":")[-1]:
-        raise HTTPException(422, "此版本只使用本地模型。")
+        raise HTTPException(422, "Local Model 只能选择本地 Ollama 模型。")
     row = db.get(AISettings, 1)
     if row is None:
         row = AISettings(id=1)
         db.add(row)
-    row.model, row.num_ctx, row.temperature, row.think = data.model, data.num_ctx, str(data.temperature), data.think
+    row.mode, row.model, row.num_ctx, row.temperature, row.think = data.mode, data.model, data.num_ctx, str(data.temperature), data.think
     db.commit()
     return data
 

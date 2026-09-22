@@ -1,4 +1,19 @@
-# 本地 AI Agent 使用说明
+# AI Agent 使用说明
+
+## DeepSeek 配置
+
+复制 `.env.example` 中的 DeepSeek 字段到项目根目录 `.env`，只填写后端变量：
+
+```dotenv
+DEEPSEEK_API_KEY=你的密钥
+DEEPSEEK_BASE_URL=https://api.deepseek.com
+DEEPSEEK_MODEL=deepseek-flash
+DEEPSEEK_TIMEOUT_SECONDS=120
+DEEPSEEK_THINKING_DEFAULT=false
+LLM_DEFAULT_MODE=auto
+```
+
+保存后重启后端。真实 Key 不要填写到网页、localStorage、数据库或 Git；页面只会显示 Key 是否已配置。
 
 ## 启动
 
@@ -33,12 +48,13 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 
 ## API 与事件
 
-- `GET /api/ai/health`：Ollama、模型、Agent 和设置状态。
+- `GET /api/ai/health`：DeepSeek、Ollama、Agent、当前模式和设置状态。
+- `GET /api/ai/providers/status`：两个 Provider 的可用状态，不返回 Key。
 - `POST /api/ai/chat`：保留流式 SSE。
 - `POST /api/ai/confirm/{action_id}`：确认或取消保存的破坏性动作。
 - `GET /api/ai/conversations/{id}/actions`：最近 100 条 Agent 写操作日志。
 
-SSE 事件包括 `start`、`delta`、`reset`、`tool_status`、`tool_result`、`done`、`error`。`done` 包含本轮 `affected_entities` 和可选 `confirmation`。
+SSE 事件包括 `start`、`provider_status`、`delta`、`reset`、`tool_status`、`tool_result`、`done`、`error`。`done` 包含本轮 `affected_entities` 和可选 `confirmation`。
 
 ## 验证命令
 
@@ -54,8 +70,9 @@ npm.cmd run build
 
 ## 当前限制
 
+- 未配置 DeepSeek Key 时，Auto 会使用本地 Qwen；DeepSeek 模式会明确提示配置 Key。
 - Qwen3 8B 是小型本地模型，复杂或含糊指令可能需要更明确的任务名、日期或时间。
 - Agent 只操作 Task、Calendar 与 Routine，不修改 Goal；Project 仅作为可选关联 ID。
 - 调度采用确定性 first-fit，不做复杂最优化，也不会自主制定长期计划。
 - 操作引用主要来自当前会话最近成功动作；跨会话含糊说“刚才那个”时应补充任务名。
-- OpenAI provider 仍是接口占位；没有外部请求、RAG 或 Knowledge Base。
+- 没有 RAG、Knowledge Base 或多 Agent。

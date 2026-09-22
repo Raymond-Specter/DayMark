@@ -1,5 +1,4 @@
 import json
-from dataclasses import asdict
 from typing import AsyncIterator
 
 import httpx
@@ -43,7 +42,15 @@ class OllamaProvider:
             return False
 
     async def stream_chat(self, messages: list[Message], options: GenerationOptions, tools=None) -> AsyncIterator[ChatChunk]:
-        payload = {"model": options.model, "messages": [asdict(m) for m in messages], "stream": True,
+        serialized = []
+        for message in messages:
+            item = {"role": message.role, "content": message.content}
+            if message.tool_calls:
+                item["tool_calls"] = message.tool_calls
+            if message.tool_call_id:
+                item["tool_call_id"] = message.tool_call_id
+            serialized.append(item)
+        payload = {"model": options.model, "messages": serialized, "stream": True,
                    "think": options.think, "keep_alive": "5m", "options": {
                        "num_ctx": options.num_ctx, "temperature": options.temperature, "num_predict": 2048}}
         if tools:
@@ -61,11 +68,12 @@ class OllamaProvider:
                         if item.get("error"):
                             raise self.error(str(item["error"]))
                         message = item.get("message", {})
-                        # Deliberately discard the provider's separate thinking field.
                         finished = bool(item.get("done"))
                         yield ChatChunk(content=message.get("content", ""), done=finished,
+                                        reasoning_content=message.get("thinking", ""),
                                         tool_calls=message.get("tool_calls", []),
-                                        metrics={k: item[k] for k in ("eval_count", "prompt_eval_count", "total_duration", "done_reason") if k in item})
+                                        metrics={**{k: item[k] for k in ("eval_count", "prompt_eval_count", "total_duration", "done_reason") if k in item},
+                                                 "provider": "local", "model": options.model})
                         if finished:
                             break
             if not finished:
@@ -81,6 +89,7 @@ class OllamaProvider:
         result = ChatChunk()
         async for chunk in self.stream_chat(messages, options, tools):
             result.content += chunk.content
+            result.reasoning_content += chunk.reasoning_content
             result.tool_calls.extend(chunk.tool_calls)
             result.metrics.update(chunk.metrics)
             result.done = chunk.done

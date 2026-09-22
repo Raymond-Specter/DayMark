@@ -38,7 +38,7 @@ class AgentService:
             prompt += "\n\n当前会话最近成功操作的实体引用（只能用于定位，真实当前状态仍应查询 Tool）：\n" + json.dumps(references, ensure_ascii=False)
         return prompt
 
-    async def run(self, conversation_id, messages, options, emit):
+    async def run(self, conversation_id, messages, options, emit, mode="local", request_id=None):
         affected, confirmation, metrics = [], None, {}
         failed_calls = {}
         working = list(messages)
@@ -51,20 +51,48 @@ class AgentService:
         if requires_tool:
             working = [working[0], working[-1]]
         used_tools = False
+        successful_write = False
+        tool_count = 0
+        route = self.llm.create_session(mode, options) if hasattr(self.llm, "create_session") else None
+        if route:
+            await emit({"event": "provider_status", "provider": route.name, "model": route.options.model})
         available_tools = self._tool_schemas(user_text)
         for _ in range(self.max_steps):
-            content, calls = "", []
-            stream = self.llm.stream_chat(working, options, available_tools)
-            try:
-                async for chunk in stream:
-                    metrics.update(chunk.metrics)
-                    calls.extend(chunk.tool_calls)
-                    if chunk.content:
-                        content += chunk.content
-                        await emit({"event": "delta", "content": chunk.content})
-            finally:
-                await stream.aclose()
+            while True:
+                content, reasoning, calls = "", "", []
+                stream = (route.stream_chat(working, available_tools) if route
+                          else self.llm.stream_chat(working, options, available_tools))
+                try:
+                    async for chunk in stream:
+                        metrics.update(chunk.metrics)
+                        calls.extend(chunk.tool_calls)
+                        reasoning += chunk.reasoning_content
+                        if chunk.content:
+                            content += chunk.content
+                            await emit({"event": "delta", "content": chunk.content})
+                    break
+                except LLMError as error:
+                    if route and route.try_fallback(error, successful_write):
+                        if content:
+                            await emit({"event": "reset"})
+                        await emit({"event": "provider_status", "provider": route.name,
+                                    "model": route.options.model, "fallback": True,
+                                    "message": "DeepSeek 暂时不可用，已切换到本地 Qwen。"})
+                        continue
+                    if successful_write:
+                        if content:
+                            await emit({"event": "reset"})
+                        metrics.update({"provider_error": error.code, "write_completed": True})
+                        return AgentOutcome(content="操作已经完成，但 AI 最终回复生成失败。请刷新任务或日历查看结果。",
+                                            metrics=metrics, affected_entities=self._unique(affected),
+                                            confirmation=confirmation)
+                    raise
+                finally:
+                    await stream.aclose()
             if not calls:
+                if route:
+                    metrics.update({"provider": route.name, "model": route.options.model,
+                                    "fallback": route.fell_back, "tool_count": tool_count})
                 if requires_tool and not used_tools:
                     if self._is_clarification(content):
                         return AgentOutcome(content=content, metrics=metrics)
@@ -80,7 +108,8 @@ class AgentService:
             if content:
                 await emit({"event": "reset"})
             used_tools = True
-            working.append(Message("assistant", content, tool_calls=calls))
+            working.append(Message("assistant", content, tool_calls=calls,
+                                   reasoning_content=reasoning or None))
             for call in calls:
                 function = call.get("function", {})
                 name, arguments = function.get("name", ""), function.get("arguments", {})
@@ -88,7 +117,14 @@ class AgentService:
                 definition = self.registry.definitions.get(name)
                 status = definition.status_text if definition else "正在处理操作…"
                 await emit({"event": "tool_status", "tool": name, "message": status})
-                result = self.executor.execute(conversation_id, name, arguments)
+                tool_count += 1
+                result = self.executor.execute(
+                    conversation_id, name, arguments, request_id=request_id,
+                    provider=route.name if route else metrics.get("provider", "local"),
+                    model=route.options.model if route else options.model,
+                )
+                if definition and definition.permission.value != "read" and result.success:
+                    successful_write = True
                 affected.extend(result.affected_entities)
                 confirmation = result.confirmation or confirmation
                 await emit({"event": "tool_result", "tool": name, "success": result.success,
@@ -104,6 +140,9 @@ class AgentService:
                         return AgentOutcome(
                             content=f"无法执行这个操作：{result.message}", metrics=metrics,
                             affected_entities=self._unique(affected), confirmation=confirmation)
+        if route:
+            metrics.update({"provider": route.name, "model": route.options.model,
+                            "fallback": route.fell_back, "tool_count": tool_count})
         raise LLMError("tool_loop_limit", "工具调用次数过多，已停止且保留已经成功完成的操作。", 409)
 
     @staticmethod

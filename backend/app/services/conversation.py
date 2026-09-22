@@ -4,6 +4,7 @@ import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from time import monotonic
+from uuid import uuid4
 
 from fastapi import HTTPException
 from sqlalchemy import select
@@ -22,8 +23,8 @@ SYSTEM_PROMPT = (Path(__file__).resolve().parents[1] / "prompts/planner_system_p
 
 def read_settings(db, config: LLMConfig):
     row = db.get(AISettings, 1)
-    return ModelSettings(model=row.model, num_ctx=row.num_ctx, temperature=float(row.temperature), think=row.think) if row else ModelSettings(
-        model=config.model, num_ctx=config.num_ctx, temperature=config.temperature, think=config.think)
+    return ModelSettings(mode=row.mode, model=row.model, num_ctx=row.num_ctx, temperature=float(row.temperature), think=row.think) if row else ModelSettings(
+        mode=config.default_mode, model=config.model, num_ctx=config.num_ctx, temperature=config.temperature, think=config.think)
 
 
 def history(db, key):
@@ -73,6 +74,7 @@ class Run:
     task: asyncio.Task | None = None
     result: dict | None = None
     stopping: bool = False
+    request_id: str = field(default_factory=lambda: str(uuid4()))
 
 
 class ConversationService:
@@ -86,7 +88,9 @@ class ConversationService:
             raise HTTPException(409, "已有一个回答正在生成，请先停止或等待完成。")
         conversation = require(db, Conversation, payload.conversation_id)
         settings = read_settings(db, self.config)
-        options = GenerationOptions(**settings.model_dump(), timeout=self.config.timeout)
+        options = GenerationOptions(model=settings.model, num_ctx=settings.num_ctx,
+                                    temperature=settings.temperature, think=settings.think,
+                                    timeout=self.config.timeout)
         rows = history(db, conversation.id)
         attachments = list(db.scalars(select(ChatAttachment).where(ChatAttachment.conversation_id == conversation.id)))
         attachment_map = {}
@@ -113,11 +117,12 @@ class ConversationService:
         run = Run(conversation.id, assistant.id)
         self.active = run
         factory = sessionmaker(db.get_bind(), expire_on_commit=False)
-        run.queue.put_nowait({"event": "start", "conversation_id": conversation.id, "message_id": assistant.id, "context_trimmed": truncated})
-        run.task = asyncio.create_task(self._generate(run, factory, messages, options))
+        run.queue.put_nowait({"event": "start", "conversation_id": conversation.id, "message_id": assistant.id,
+                              "request_id": run.request_id, "context_trimmed": truncated})
+        run.task = asyncio.create_task(self._generate(run, factory, messages, options, settings.mode))
         return run
 
-    async def _generate(self, run, factory, messages, options):
+    async def _generate(self, run, factory, messages, options, mode):
         content, status, error, metrics = "", "completed", None, {}
         affected_entities, confirmation = [], None
         started, saved_at = monotonic(), monotonic()
@@ -136,7 +141,8 @@ class ConversationService:
             async def consume():
                 nonlocal content, metrics, affected_entities, confirmation
                 if self.agent:
-                    outcome = await self.agent.run(run.conversation_id, messages, options, emit)
+                    outcome = await self.agent.run(run.conversation_id, messages, options, emit,
+                                                   mode=mode, request_id=run.request_id)
                     content, metrics = outcome.content, outcome.metrics
                     affected_entities, confirmation = outcome.affected_entities, outcome.confirmation
                     return
@@ -155,27 +161,41 @@ class ConversationService:
         except (asyncio.TimeoutError, LLMError) as exc:
             status = "error"
             error = exc.message if isinstance(exc, LLMError) else "生成超过总时限，已保留部分回答，请重试。"
+            metrics.setdefault("error_type", exc.code if isinstance(exc, LLMError) else "total_timeout")
         except Exception:
             logger.exception("AI generation failed")
             status, error = "error", "生成或保存失败，请检查后端日志后重试。"
         finally:
+            duration_ms = round((monotonic() - started) * 1000)
+            logger.info("ai_request_complete", extra={
+                "request_id": run.request_id,
+                "provider": metrics.get("provider"),
+                "model": metrics.get("model", options.model),
+                "duration_ms": duration_ms,
+                "tool_count": metrics.get("tool_count", 0),
+                "fallback": metrics.get("fallback", False),
+                "status": status,
+                "error_type": (metrics.get("provider_error") or metrics.get("error_type")) if error else None,
+            })
             try:
-                self._save(factory, run, content, status, error, started)
+                self._save(factory, run, content, status, error, started, metrics.get("model"))
             except Exception:
                 logger.exception("Could not persist final chat message")
                 status, error = "error", "数据库保存失败，当前回答可能未完整保存，请检查磁盘和后端日志。"
             run.result = {"event": "error" if error else "done", "message_id": run.message_id, "conversation_id": run.conversation_id,
-                          "content": content, "status": status, "error": error, "duration_ms": round((monotonic() - started) * 1000),
+                          "content": content, "status": status, "error": error, "duration_ms": duration_ms,
                           "metrics": metrics, "affected_entities": affected_entities, "confirmation": confirmation}
             run.queue.put_nowait(run.result)
             if self.active is run:
                 self.active = None
 
-    def _save(self, factory, run, content, status, error, started):
+    def _save(self, factory, run, content, status, error, started, model=None):
         with factory() as db:
             row = db.get(ChatMessage, run.message_id)
             if row:
                 row.content, row.status, row.error = content, status, error
+                if model:
+                    row.model = model
                 row.duration_ms = round((monotonic() - started) * 1000)
                 conversation = db.get(Conversation, run.conversation_id)
                 if conversation:

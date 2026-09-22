@@ -1,6 +1,7 @@
 import { api } from "./api";
 
 export interface ModelSettings {
+  mode: "auto" | "deepseek" | "local";
   model: string;
   num_ctx: number;
   temperature: number;
@@ -13,6 +14,11 @@ export interface AIHealth {
   busy: boolean;
   error: string | null;
   settings: ModelSettings;
+  selected_mode: ModelSettings["mode"];
+  providers?: {
+    deepseek: { configured: boolean; online: boolean; model: string; error?: string | null };
+    local: { configured: boolean; online: boolean; model_available: boolean; model: string; error?: string | null };
+  };
 }
 export interface Conversation {
   id: string;
@@ -48,6 +54,7 @@ export interface ChatEvent {
     | "reset"
     | "tool_status"
     | "tool_result"
+    | "provider_status"
     | "done"
     | "error";
   conversation_id?: string;
@@ -62,6 +69,9 @@ export interface ChatEvent {
   success?: boolean;
   affected_entities?: { type: string; id: string }[];
   confirmation?: AgentConfirmation | null;
+  provider?: "deepseek" | "local";
+  model?: string;
+  fallback?: boolean;
 }
 export interface AgentConfirmation {
   action_id: string;

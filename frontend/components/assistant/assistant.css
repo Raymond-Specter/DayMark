@@ -19,6 +19,8 @@
   align-items: center;
   gap: 12px;
 }
+.ai-mode-select { display: flex; align-items: center; gap: 8px; font-size: 11px; color: #75839a; }
+.ai-mode-select select { border: 1px solid #e1e5ef; border-radius: 9px; padding: 7px 28px 7px 9px; background: #fafbfe; color: #34425b; }
 .ai-chip {
   width: 42px;
   height: 42px;

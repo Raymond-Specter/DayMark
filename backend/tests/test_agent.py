@@ -91,6 +91,20 @@ def test_conflict_free_slot_reschedule_complete_and_undo(session_factory):
     assert undone.success and undone.data["status"] != "completed"
 
 
+def test_write_tool_is_idempotent_within_request(session_factory):
+    _, tools = executor(session_factory)
+    with session_factory() as db:
+        conversation = Conversation(); db.add(conversation); db.commit(); key = conversation.id
+    arguments = {"title": "只创建一次", "date": "2026-09-22", "start_time": "10:00", "duration_minutes": 30}
+    first = tools.execute(key, "create_task", arguments, request_id="request-1", provider="deepseek", model="deepseek-flash")
+    second = tools.execute(key, "create_task", arguments, request_id="request-1", provider="deepseek", model="deepseek-flash")
+    assert first.success and second.success and first.data["id"] == second.data["id"]
+    with session_factory() as db:
+        assert len(list(db.scalars(select(Task).where(Task.title == "只创建一次")))) == 1
+        log = db.scalar(select(AgentActionLog).where(AgentActionLog.request_id == "request-1"))
+        assert (log.provider, log.model, len(log.fingerprint)) == ("deepseek", "deepseek-flash", 64)
+
+
 def test_destructive_action_uses_exact_saved_confirmation(session_factory):
     _, tools = executor(session_factory)
     with session_factory() as db:

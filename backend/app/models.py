@@ -209,6 +209,7 @@ class AISettings(Base):
     num_ctx: Mapped[int] = mapped_column(Integer)
     temperature: Mapped[str] = mapped_column(String, default="0.6")
     think: Mapped[bool] = mapped_column(Boolean, default=False)
+    mode: Mapped[str] = mapped_column(String(20), default="auto")
 
 
 class AgentActionLog(Record, Base):
@@ -223,6 +224,10 @@ class AgentActionLog(Record, Base):
     affected_entities: Mapped[list] = mapped_column(JSON, default=list)
     error_message: Mapped[str | None] = mapped_column(Text)
     undone_at: Mapped[str | None] = mapped_column(String)
+    request_id: Mapped[str | None] = mapped_column(String(36), index=True)
+    provider: Mapped[str | None] = mapped_column(String(30))
+    model: Mapped[str | None] = mapped_column(String(200))
+    fingerprint: Mapped[str | None] = mapped_column(String(64), unique=True)
 
 
 class PendingAgentAction(Record, Base):
@@ -234,3 +239,6 @@ class PendingAgentAction(Record, Base):
     affected_count: Mapped[int] = mapped_column(Integer, default=0)
     status: Mapped[str] = mapped_column(String(20), default="pending", index=True)
     resolved_at: Mapped[str | None] = mapped_column(String)
+    request_id: Mapped[str | None] = mapped_column(String(36))
+    provider: Mapped[str | None] = mapped_column(String(30))
+    model: Mapped[str | None] = mapped_column(String(200))

@@ -6,6 +6,7 @@ class AIInput(BaseModel):
 
 
 class ModelSettings(AIInput):
+    mode: str = Field(default="auto", pattern=r"^(auto|deepseek|local)$")
     model: str = Field(default="qwen3:8b", min_length=1, max_length=200, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9_./:-]*$")
     num_ctx: int = Field(default=8192, ge=2048, le=8192)
     temperature: float = Field(default=0.6, ge=0, le=2)

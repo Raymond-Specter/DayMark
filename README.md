@@ -56,9 +56,11 @@ Pop-Location
 
 任务计划程序的“程序”填写项目内 `.venv\Scripts\python.exe` 的绝对路径，“参数”填写 `-m app.reminder_cli`，“起始于”填写 `backend` 的绝对路径。应用没有永久运行的 Python 提醒循环。Google Calendar 尚未接入；本地 AI 的使用方式见下节，无需外部账户。
 
-## 本地 AI Assistant
+## AI Assistant
 
-使用 Ollama 的 `qwen3:8b`，默认 8192 context、temperature 0.6、Thinking Off。所有 Ollama 程序、模型、状态文件均放在项目下，不需要管理员权限，也不修改系统环境变量。
+默认 `Auto` 模式优先使用 DeepSeek Cloud 的 `deepseek-flash`，云端出现可恢复错误且尚未成功写入时安全降级到项目内 `qwen3:8b`。也可以固定选择 `DeepSeek` 或 `Local Qwen`。Agent、工具、业务 Service 和 SQLite 数据始终只有一套。
+
+把 `DEEPSEEK_API_KEY` 写入项目根目录 `.env` 后重启即可启用云端；Key 只由 FastAPI 后端读取，不会返回前端或保存进数据库。完整变量见 `.env.example`。
 
 ```powershell
 # 首次显式安装项目内的 Ollama、启动服务并下载模型（需要数 GB 下载）

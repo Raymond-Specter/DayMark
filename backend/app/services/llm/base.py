@@ -14,6 +14,8 @@ class Message:
     content: str
     tool_calls: list[dict] = field(default_factory=list)
     tool_call_id: str | None = None
+    reasoning_content: str | None = None
+    provider_metadata: dict = field(default_factory=dict)
 
 
 @dataclass
@@ -31,6 +33,7 @@ class ChatChunk:
     done: bool = False
     tool_calls: list[dict] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
+    reasoning_content: str = ""
 
 
 class LLMProvider(Protocol):

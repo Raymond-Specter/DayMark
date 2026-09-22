@@ -1,11 +1,12 @@
-# 本地 AI Agent 架构
+# DeepSeek Cloud + Local Qwen Agent 架构
 
 ## 执行链
 
 DayMark 在原有 Next.js / FastAPI / SQLAlchemy 架构上增加独立 Agent 层，不建立第二套任务数据，也不允许模型执行 SQL。
 
 ```text
-AI Chat → Conversation Service → Agent Service → Qwen3 Tool Calling
+AI Chat → Conversation Service → Agent Service → Provider Router
+        → DeepSeek Cloud（默认）或 Local Qwen（降级/手动）
         → Tool Registry → Tool Executor → 既有 Planner / Scheduler / Calendar Service
         → SQLAlchemy → SQLite → affected_entities → 前端 refresh()
 ```
@@ -23,7 +24,10 @@ Agent Loop 最多执行 8 步。模型返回 tool call 后，执行器调用注�
 - `backend/app/agent/planner_service.py`：冲突检测、空闲时段合并和 first-fit 调度。
 - `backend/app/prompts/agent_system_prompt.txt`：执行型 Agent 规则。
 - `backend/app/services/conversation.py`：聊天历史、SSE、Agent 调用、停止与持久化。
-- `backend/app/services/llm/`：Ollama provider 和模型协议，不硬编码工具。
+- `backend/app/services/llm/base.py`：Provider 共用消息、流式结果和错误协议。
+- `backend/app/services/llm/deepseek_provider.py`：DeepSeek Chat Completions、SSE、Tool Calls 与 thinking 上下文。
+- `backend/app/services/llm/ollama_provider.py`：本地 Qwen/Ollama 适配器。
+- `backend/app/services/llm/router.py`：按请求选择 Provider 并执行安全降级；不包含工具或业务逻辑。
 
 ## 工具与权限
 
@@ -41,10 +45,20 @@ DESTRUCTIVE 必须确认：`delete_task`。一次 `replan_day` 影响超过 3 �
 
 SSE 增加 `tool_status`、`tool_result` 和 `reset`。前端收到 `affected_entities` 后调用现有 `refresh()`，同时重取 bootstrap、today、statistics、progress 并递增日历 revision；无需 React Query。
 
-写操作保存参数、before/after 快照、状态和错误。`undo_last_action` 可撤销 create/schedule/update/reschedule/complete/replan；创建类撤销为软删除，其余按快照恢复并再次走 Planner 同步。
+写操作保存参数、before/after 快照、状态、错误、`request_id`、Provider、模型与参数指纹。相同请求再次发出同一个写调用时直接返回第一次结果，不重复写库。`undo_last_action` 可撤销 create/schedule/update/reschedule/complete/replan；创建类撤销为软删除，其余按快照恢复并再次走 Planner 同步。
+
+## Provider 路由与降级
+
+- `Auto`：先调用 DeepSeek。只有网络、超时、限流、服务不可用或未配置 Key 这类可恢复错误，且本轮尚无成功 WRITE 时，才切换到本地 Qwen。
+- `DeepSeek`：固定使用云端，失败时明确报错，不自动降级。
+- `Local Qwen`：固定使用项目内 Ollama，不发送云端请求。
+
+一旦 WRITE 已成功，后续 DeepSeek 故障不会重跑 Agent 或切换模型；系统返回“操作已经完成，但最终回复失败”，避免同一任务、日历事件或 Routine 被创建两次。READ 调用不阻止安全降级。
+
+Thinking 内容只存在于当前 Provider 调用的内存上下文。DeepSeek 工具循环会按官方协议回传 `reasoning_content`，但 SSE、聊天正文和数据库消息都不显示或保存它。
 
 ## 数据与运行边界
 
-迁移 `0002` / `0003` 保存会话、消息与模型设置；`0004` 新增 `agent_action_logs` 和 `pending_agent_actions`。模型、Ollama 程序、SQLite 与日志均在项目目录内且不提交 Git。
+迁移 `0002` / `0003` 保存会话、消息与模型设置；`0004` 新增 Agent 操作表；`0006` 增加 Provider 模式和请求级幂等元数据。模型、Ollama 程序、SQLite、日志与 `.env` 均不提交 Git。
 
-默认模型为 `qwen3:8b`，context 8192、temperature 0.6、Thinking Off。Ollama 离线时 AI health 显示不可用，Task、Calendar、Routine 和统计 API 继续工作。当前没有 RAG、知识库、文件上传、多 Agent、长期自动规划或云端推理。
+默认模式为 `Auto`，云端模型 `deepseek-flash`，本地后备 `qwen3:8b`。API Key 只从后端环境读取，状态接口只返回 `configured` 布尔值。两个 Provider 都不可用时，Task、Calendar、Routine 和统计 API 仍继续工作。系统不包含 RAG、多 Agent 或长期自动规划。

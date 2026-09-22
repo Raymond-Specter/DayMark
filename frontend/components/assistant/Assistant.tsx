@@ -211,6 +211,10 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             if (event.affected_entities?.length) changed?.();
             return;
           }
+          if (event.event === "provider_status") {
+            if (event.fallback) setNotice(event.message || "已切换到本地模型。");
+            return;
+          }
           setMessages((old) =>
             old.map((m) =>
               m.id !== placeholder
@@ -358,7 +362,19 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       setError((e as Error).message);
     }
   }
-  const online = health?.ollama_available && health?.model_available;
+  const mode = health?.settings.mode || "auto";
+  const deepseek = health?.providers?.deepseek;
+  const local = health?.providers?.local;
+  const online = mode === "deepseek" ? deepseek?.online : mode === "local" ? local?.online && local?.model_available : deepseek?.online || (local?.online && local?.model_available);
+  async function changeMode(nextMode: "auto" | "deepseek" | "local") {
+    if (!health) return;
+    try {
+      await aiRequest("/settings", { method: "PUT", body: JSON.stringify({ ...health.settings, mode: nextMode }) });
+      await refreshHealth();
+    } catch (e) {
+      setError((e as Error).message);
+    }
+  }
   const last = [...messages].reverse().find((m) => m.role === "assistant");
   return (
     <section className="ai-workspace">
@@ -368,18 +384,28 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             <Cpu size={21} />
           </div>
           <div>
-            <strong>{health?.model || "Local AI"}</strong>
+            <strong>{mode === "local" || (mode === "auto" && !deepseek?.online) ? health?.model : deepseek?.model || "DeepSeek"}</strong>
             <span>
               <i className={online ? "online" : "offline"} />
               {online
-                ? "Online · 本地运行"
-                : health?.ollama_available
-                  ? "模型未安装"
-                  : "Ollama Offline"}
+                ? mode === "local"
+                  ? "Local Qwen Online"
+                  : mode === "auto" && !deepseek?.online
+                    ? "Auto · Local Qwen fallback"
+                    : "DeepSeek Cloud Ready"
+                : "当前模式不可用"}
             </span>
           </div>
         </div>
         <div className="ai-toolbar-actions">
+          <label className="ai-mode-select">
+            <span>AI Mode</span>
+            <select value={mode} disabled={!health || busy} onChange={(e) => void changeMode(e.target.value as "auto" | "deepseek" | "local")}>
+              <option value="auto">Auto</option>
+              <option value="deepseek">DeepSeek</option>
+              <option value="local">Local Qwen</option>
+            </select>
+          </label>
           <button
             className="icon-button"
             title="刷新模型状态"
@@ -398,12 +424,11 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           </button>
         </div>
       </div>
-      {(healthError || health?.error) && (
+      {(healthError || (!online && (mode === "deepseek" ? deepseek?.error : local?.error))) && (
         <div className="ai-offline" role="status">
-          <strong>{healthError || health?.error}</strong>
+          <strong>{healthError || (mode === "deepseek" ? deepseek?.error : local?.error)}</strong>
           <span>
-            在项目目录运行 <code>.\scripts\setup_ollama.ps1 -Start</code>
-            ；首次安装加上 <code>-Install -Pull</code>。
+            {mode === "deepseek" ? "请在后端 .env 中配置 DEEPSEEK_API_KEY 后重启服务。" : <>在项目目录运行 <code>.\scripts\setup_ollama.ps1 -Start</code>。</>}
           </span>
           <button onClick={refreshHealth}>重新检查</button>
         </div>
@@ -461,9 +486,9 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           <div className="ai-private">
             <ShieldCheck size={17} />
             <span>
-              对话保存在这台电脑
+              对话记录保存在这台电脑
               <br />
-              操作通过本机工具与权限记录执行
+              云端模式会发送当前上下文到 DeepSeek
             </span>
           </div>
         </aside>
@@ -491,7 +516,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                   一起理清下一步。
                 </h2>
                 <p>
-                  与本地 AI 讨论安排、拆解问题。
+                  与 AI 讨论安排、拆解问题。
                   <br />
                   你的目标和节奏，始终由你决定。
                 </p>
@@ -725,12 +750,12 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       {debug && (
         <dl className="ai-debug">
           <div>
-            <dt>Ollama</dt>
-            <dd>{health?.ollama_available ? "Online" : "Offline"}</dd>
+            <dt>DeepSeek</dt>
+            <dd>{deepseek?.online ? "Ready" : deepseek?.configured ? "Offline" : "Key missing"}</dd>
           </div>
           <div>
-            <dt>Model</dt>
-            <dd>{health?.model || "未知"}</dd>
+            <dt>Local Qwen</dt>
+            <dd>{local?.online && local?.model_available ? "Ready" : "Offline"}</dd>
           </div>
           <div>
             <dt>Response time</dt>

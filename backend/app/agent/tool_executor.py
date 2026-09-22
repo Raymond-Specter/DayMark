@@ -1,8 +1,10 @@
 import json
+import hashlib
 from datetime import date, timedelta
 
 from fastapi import HTTPException
 from pydantic import ValidationError
+from sqlalchemy import select
 
 from ..models import AgentActionLog, PendingAgentAction, now_iso
 from .permissions import ToolPermission
@@ -14,7 +16,8 @@ class ToolExecutor:
     def __init__(self, registry, session_factory):
         self.registry, self.session_factory = registry, session_factory
 
-    def execute(self, conversation_id: str, name: str, arguments, allow_destructive=False):
+    def execute(self, conversation_id: str, name: str, arguments, allow_destructive=False,
+                request_id=None, provider=None, model=None):
         try:
             definition = self.registry.require(name)
         except ValueError:
@@ -28,6 +31,15 @@ class ToolExecutor:
             return ToolResult(success=False, error_code="INVALID_ARGUMENTS",
                               message="工具参数格式不正确，请使用要求的绝对日期、时间和字段。")
         with self.session_factory() as db:
+            fingerprint = None
+            if definition.permission != ToolPermission.READ and request_id:
+                canonical = json.dumps(checked.model_dump(), ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+                fingerprint = hashlib.sha256(f"{conversation_id}:{request_id}:{name}:{canonical}".encode()).hexdigest()
+                previous = db.scalar(select(AgentActionLog).where(
+                    AgentActionLog.fingerprint == fingerprint, AgentActionLog.status == "success"))
+                if previous:
+                    return ToolResult(success=True, message="该操作已在本次请求中成功执行，已跳过重复调用。",
+                                      data=previous.after_state, affected_entities=previous.affected_entities or [])
             tools = PlanningTools(db, conversation_id)
             affected_count = (len(tools.replan_candidates(checked)) if name == "replan_day"
                               else len(checked.courses) if name == "import_timetable" else 1)
@@ -39,6 +51,7 @@ class ToolExecutor:
                     conversation_id=conversation_id, tool_name=name,
                     tool_arguments=checked.model_dump(), description=self._description(name, checked),
                     affected_count=affected_count,
+                    request_id=request_id, provider=provider, model=model,
                 )
                 db.add(pending)
                 db.commit()
@@ -59,6 +72,8 @@ class ToolExecutor:
                         before_state=handled.before, after_state=handled.after,
                         affected_entities=handled.result.affected_entities,
                         error_message=None if handled.result.success else handled.result.message,
+                        request_id=request_id, provider=provider, model=model,
+                        fingerprint=fingerprint if handled.result.success else None,
                     ))
                 db.commit()
                 return handled.result
@@ -71,11 +86,13 @@ class ToolExecutor:
                         tool_arguments=checked.model_dump(), permission_level=definition.permission.value,
                         status="error", before_state=None, after_state=None,
                         affected_entities=[], error_message=message,
+                        request_id=request_id, provider=provider, model=model,
                     ))
                     db.commit()
                 return ToolResult(success=False, error_code="TOOL_FAILED", message=message)
 
-    def confirm(self, conversation_id: str, action_id: str, approve: bool):
+    def confirm(self, conversation_id: str, action_id: str, approve: bool,
+                request_id=None, provider=None, model=None):
         with self.session_factory() as db:
             pending = db.get(PendingAgentAction, action_id)
             if not pending or pending.conversation_id != conversation_id or pending.status != "pending":
@@ -84,9 +101,13 @@ class ToolExecutor:
             pending.resolved_at = now_iso()
             db.commit()
             name, arguments = pending.tool_name, pending.tool_arguments
+            request_id = request_id or pending.request_id
+            provider = provider or pending.provider
+            model = model or pending.model
         if not approve:
             return ToolResult(success=False, error_code="CANCELLED", message="已取消该操作。")
-        return self.execute(conversation_id, name, arguments, allow_destructive=True)
+        return self.execute(conversation_id, name, arguments, allow_destructive=True,
+                            request_id=request_id, provider=provider, model=model)
 
     @staticmethod
     def _safe_error(error):

@@ -127,7 +127,7 @@ const pages: {
     id: "assistant",
     title: "AI Assistant",
     english: "Local AI",
-    subtitle: "与本地 AI 理清想法，让下一步更清晰。",
+    subtitle: "用 DeepSeek 或本地 Qwen 理清想法，让下一步更清晰。",
     icon: Sparkles,
   },
   {
