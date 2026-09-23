@@ -14,6 +14,7 @@ import type {
   EditorState,
   Task,
 } from "@/lib/types";
+import "./calendar-dark.css";
 
 export default function CalendarView({
   data,
@@ -29,7 +30,7 @@ export default function CalendarView({
   notify: (message: string, error?: boolean) => void;
 }) {
   const calendar = useRef<FullCalendar>(null);
-  const [view, setView] = useState("dayGridMonth");
+  const [view, setView] = useState("timeGridWeek");
   const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const fetchEvents = useCallback(async (
@@ -113,6 +114,10 @@ export default function CalendarView({
     <div className="calendar-panel panel">
       <div className="calendar-toolbar">
         <div className="calendar-controls">
+          <div className="calendar-title">
+            <span>时间日历</span>
+            <h2>{title}</h2>
+          </div>
           <button
             className="icon-button"
             aria-label="上一个日期范围"
@@ -127,7 +132,6 @@ export default function CalendarView({
           >
             <ChevronRight size={19} />
           </button>
-          <h2>{title}</h2>
           <button
             className="button secondary small"
             onClick={() => calendar.current?.getApi().gotoDate(data.today)}
@@ -163,26 +167,27 @@ export default function CalendarView({
       <div className="calendar-caption">
         <span>
           <span className="dot blue" />
-          任务与日程
+          任务与日程 · 点击空白处添加任务
         </span>
         <span>
           <CalendarDays size={14} />
-          点击空白日期添加任务 · 拖动或拉伸调整时间
+          拖动调整日期，拉伸调整时长
         </span>
         <span>
           {data.settings.timezone}
           {loading ? " · 同步中…" : ""}
         </span>
       </div>
+      <div className={`calendar-stage calendar-stage-${view}`}>
       <FullCalendar
         ref={calendar}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
         locale={zhLocale}
         firstDay={1}
         initialDate={data.today}
-        initialView="dayGridMonth"
+        initialView="timeGridWeek"
         headerToolbar={false}
-        height={view === "dayGridMonth" ? "auto" : 640}
+        height={view === "dayGridMonth" ? "auto" : 740}
         dayMaxEvents={3}
         editable
         selectable
@@ -193,8 +198,21 @@ export default function CalendarView({
         fixedWeekCount={false}
         slotMinTime="00:00:00"
         slotMaxTime="24:00:00"
-        scrollTime="08:00:00"
+        scrollTime="06:00:00"
+        slotDuration="00:30:00"
+        slotLabelInterval="01:00:00"
+        slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
         allDayText="全天"
+        dayHeaderContent={(info) =>
+          info.view.type === "dayGridMonth" ? (
+            info.text
+          ) : (
+            <span className={`calendar-day-head${info.isToday ? " is-today" : ""}`}>
+              <span>{new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(info.date)}</span>
+              <span className="calendar-day-number">{info.date.getDate()}</span>
+            </span>
+          )
+        }
         buttonText={{ today: "今天", month: "月", week: "周", day: "日" }}
         eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
         datesSet={(info) => setTitle(info.view.title)}
@@ -225,13 +243,19 @@ export default function CalendarView({
                 : info.event.endStr.slice(0, 16),
               all_day: info.event.allDay,
               description: info.event.extendedProps.description || "",
-              color: info.event.backgroundColor || "#315e70",
+              color: info.event.backgroundColor || "#acbcf7",
             };
             edit({ kind: "event", item: event });
           }
         }}
         eventDrop={move}
         eventResize={move}
+        eventDidMount={(info) => {
+          info.el.style.setProperty(
+            "--calendar-accent",
+            info.event.backgroundColor || "#acbcf7",
+          );
+        }}
         eventClassNames={(info) =>
           info.event.extendedProps.task?.status === "completed"
             ? ["calendar-completed"]
@@ -240,6 +264,7 @@ export default function CalendarView({
               : []
         }
       />
+      </div>
     </div>
   );
 }

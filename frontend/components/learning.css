@@ -175,3 +175,42 @@
 @media (prefers-reduced-motion: reduce) {
   .learning-page *, .learning-page *::before, .learning-page *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* Archive and knowledge surfaces in the shared charcoal theme. */
+.learning-page { color-scheme: dark; }
+.learning-stats article, .learning-toolbar, .knowledge-hero {
+  border-color: #303238;
+  background: #1c1e23;
+  box-shadow: none;
+}
+.learning-stats svg, .document-icon, .document-icon.code {
+  background: #2a3550;
+  color: #acbcf7;
+}
+.learning-stats span, .learning-form-grid label, .timeline-date span,
+.learning-card > div:first-child, .learning-card > p, .learning-card footer,
+.document-main > div, .document-main p, .document-main footer,
+.knowledge-hero p { color: #a5a7ae; }
+.learning-stats strong, .timeline-date strong, .learning-card h2,
+.learning-empty h2, .knowledge-hero h2, .document-main h2 { color: #f5f5f4; }
+.learning-toolbar select, .learning-toolbar .search-input,
+.learning-form-grid input, .learning-form-grid select, .learning-form-grid textarea,
+.upload-drop input {
+  border-color: #414550;
+  background: #23252b;
+  color: #f5f5f4;
+}
+.learning-toolbar select:hover { border-color: #7791c8; }
+.learning-card { border-left-color: #acbcf7; }
+.learning-card:hover, .document-card:hover { border-color: #53627e; box-shadow: 0 12px 24px #00000024; }
+.learning-card:hover { border-left-color: #acbcf7; }
+.learning-type, .document-main b { background: #2b3650; color: #bdd0fc; }
+.learning-card aside { border-color: #5b493b; background: #302923; color: #e7c49f; }
+.learning-card footer, .document-main footer { border-top-color: #303238; }
+.learning-empty { border-color: #3d424d; background: #1c1e23; color: #a5a7ae; }
+.learning-empty svg, .knowledge-hero span, .document-main footer a { color: #acbcf7; }
+.knowledge-hero { border-left-color: #acbcf7; }
+.document-main i { color: #b8c7e4; }
+.learning-page button:focus-visible, .learning-page select:focus-visible,
+.learning-page a:focus-visible, .learning-page input:focus-visible,
+.learning-page textarea:focus-visible { outline-color: #acbcf7; }

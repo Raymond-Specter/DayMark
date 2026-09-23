@@ -182,7 +182,7 @@ export function Dashboard({
               >
                 <div>
                   <span>
-                    <i style={{ backgroundColor: p.color || "#315e70" }} />
+                    <i style={{ backgroundColor: p.color || "#acbcf7" }} />
                     {p.name}
                   </span>
                   <strong>

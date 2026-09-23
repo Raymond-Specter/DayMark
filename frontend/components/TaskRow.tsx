@@ -35,7 +35,7 @@ export default function TaskRow({
 }) {
   const project = data.projects.find((p) => p.id === task.project_id);
   const color =
-    data.goals.find((g) => g.id === project?.goal_id)?.color || "#315e70";
+    data.goals.find((g) => g.id === project?.goal_id)?.color || "#acbcf7";
   const completed = task.status === "completed";
   const cancelled = task.status === "cancelled";
   return (

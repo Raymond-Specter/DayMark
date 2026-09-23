@@ -365,7 +365,7 @@ export default function Home() {
     ...progress.goals.flatMap((g) =>
       g.projects.map((p) => ({ ...p, color: g.color })),
     ),
-    ...progress.standalone_projects.map((p) => ({ ...p, color: "#315e70" })),
+    ...progress.standalone_projects.map((p) => ({ ...p, color: "#acbcf7" })),
   ].filter((p) => !["completed", "archived"].includes(p.status));
   const dailyPercent =
     remaining.length + complete.length
