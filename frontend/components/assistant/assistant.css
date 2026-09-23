@@ -787,3 +787,36 @@
     gap: 8px;
   }
 }
+
+/* Keep the assistant in the same restrained visual system as the planner. */
+.ai-workspace { border-color: var(--line); border-radius: 7px; box-shadow: 0 8px 24px #0c20290c; }
+.ai-toolbar { background: #fbfcfb; border-bottom-color: var(--line); }
+.ai-chip, .ai-welcome-icon { border-radius: 3px; background: #e7f0f2; color: #205b72; transform: none; }
+.ai-model-label strong { color: #172b33; }
+.ai-model-label span, .ai-mode-select { color: #5b7079; }
+.ai-mode-select select { border-radius: 3px; background: #fff; color: #24434f; }
+.ai-history { background: #f3f6f5; border-right-color: var(--line); }
+.ai-history-heading { color: #59727a; text-transform: uppercase; }
+.ai-new-chat, .ai-conversation { border-radius: 3px; }
+.ai-new-chat.selected, .ai-conversation.selected { background: #e1edef; color: #1e5367; }
+.ai-conversation > button:first-child:hover { color: #1b5065; }
+.ai-welcome > span { color: #557b88; text-transform: uppercase; }
+.ai-welcome h2 { color: #182d35; font-weight: 650; letter-spacing: -.04em; }
+.ai-welcome p { color: #697d84; }
+.ai-suggestions button { border-color: #d7e1e3; border-radius: 3px; color: #315360; }
+.ai-suggestions button:hover { border-color: #87afbb; background: #f4f9f9; transform: translateY(-2px); }
+.ai-message-avatar { border-radius: 3px; background: #e3eff1; color: #205b72; }
+.ai-message-user .ai-message-avatar { background: #e9edef; color: #526772; }
+.ai-message-user .ai-markdown { border-color: #dbe5e7; border-radius: 3px; background: #f1f6f6; }
+.ai-markdown { color: #293e47; }
+.ai-markdown h1, .ai-markdown h2, .ai-markdown h3 { color: #162d36; }
+.ai-markdown a { color: #176079; }
+.ai-markdown blockquote { border-left-color: #85aeba; }
+.ai-composer { border-color: #bdcfd4; border-radius: 5px; box-shadow: none; transition: border-color .2s ease, box-shadow .2s ease; }
+.ai-composer:focus-within { border-color: #387a90; box-shadow: 0 0 0 3px #205b721c; }
+.ai-attach, .ai-send, .ai-stop, .ai-pending-attachments > div, .ai-message-attachments a { border-radius: 3px; }
+.ai-send { background: #143e4d; }
+.ai-send:hover:not(:disabled) { background: #236c84; transform: translateY(-2px); }
+.ai-attach:hover:not(:disabled) { border-color: #77a0ae; color: #205b72; background: #edf6f7; }
+.ai-settings-drawer { border-radius: 0; }
+.ai-key-panel, .ai-confirm, .ai-error { border-radius: 5px; }

@@ -64,4 +64,15 @@
 .learning-stats{grid-template-columns:1fr 1fr}
 }
 
+.learning-stats article { border-radius: 6px; border-color: var(--line); box-shadow: 0 3px 12px #0c202908; }
+.learning-stats svg { border-radius: 3px; background: #e8f1f2; color: #205b72; }
+.learning-stats strong { font-family: Bahnschrift, "Arial Narrow", "Segoe UI", sans-serif; color: #183a48; font-variant-numeric: tabular-nums; }
+.learning-card { border-left-color: #2b6d82; }
+.learning-type { border-radius: 2px; background: #e7f0f2; color: #205b72; }
+.knowledge-hero { background: linear-gradient(110deg, #fff 20%, #e8f0f1); border-left: 3px solid #235c70; }
+.knowledge-hero span { color: #31677a; }
+.document-icon, .document-icon.code { border-radius: 3px; background: #e8f1f2; color: #205b72; }
+.document-main b { border-radius: 2px; background: #e7f0f2; color: #205b72; }
+.document-main footer a { color: #205b72; }
+
 
