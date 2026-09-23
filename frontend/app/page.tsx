@@ -359,12 +359,13 @@ export default function Home() {
       (t) => !["completed", "cancelled"].includes(t.status),
     ) || [];
   const complete = today?.tasks.filter((t) => t.status === "completed") || [];
+  const timedTasks = remaining.filter((t) => t.start_time);
   const nextTask = remaining.find((t) => !t.blocked);
   const activeProjects = [
     ...progress.goals.flatMap((g) =>
       g.projects.map((p) => ({ ...p, color: g.color })),
     ),
-    ...progress.standalone_projects.map((p) => ({ ...p, color: "#5369ed" })),
+    ...progress.standalone_projects.map((p) => ({ ...p, color: "#315e70" })),
   ].filter((p) => !["completed", "archived"].includes(p.status));
   const dailyPercent =
     remaining.length + complete.length
@@ -444,7 +445,7 @@ export default function Home() {
           <ChevronRight size={15} />
         </div>
         <span className="nav-caption">你的每一天</span>
-        <nav>
+        <nav aria-label="主要导航">
           {pages.slice(0, 3).map((p) => (
             <button
               key={p.id}
@@ -458,20 +459,25 @@ export default function Home() {
               )}
             </button>
           ))}
-          <span className="nav-caption second">看得更远</span>
-          {pages
-            .slice(3)
-            .filter((p) => p.id !== "settings")
-            .map((p) => (
-              <button
-                key={p.id}
-                onClick={() => navigate(p.id)}
-                className={page === p.id ? "active" : ""}
-              >
-                <p.icon size={19} />
-                <span>{p.title}</span>
-              </button>
-            ))}
+          {[
+            { label: "规划", items: pages.slice(3, 5) },
+            { label: "知识与回顾", items: pages.slice(5, 9) },
+            { label: "智能工作台", items: pages.slice(9, 10) },
+          ].map((group) => (
+            <div className="nav-group" key={group.label}>
+              <span className="nav-caption second">{group.label}</span>
+              {group.items.map((p) => (
+                <button
+                  key={p.id}
+                  onClick={() => navigate(p.id)}
+                  className={page === p.id ? "active" : ""}
+                >
+                  <p.icon size={19} />
+                  <span>{p.title}</span>
+                </button>
+              ))}
+            </div>
+          ))}
         </nav>
         <div className="sidebar-bottom">
           <div className="sidebar-note">
@@ -661,36 +667,41 @@ export default function Home() {
                   <section className="today-hero">
                     <div className="hero-main">
                       <div className="hero-kicker">
-                        <span className="hero-live-dot" /> TODAY IS A FRESH
-                        START
+                        <span className="hero-live-dot" /> DAILY BRIEFING
+                        <span className="hero-date">{dateLabel(data.today)}</span>
                       </div>
                       <h2>
                         {remaining.length
-                          ? `今天，有 ${remaining.length} 件事值得推进。`
+                          ? `今天还有 ${remaining.length} 项待完成。`
                           : complete.length
-                            ? "今天的安排，已经好好完成。"
-                            : "新的一天，从一小步开始。"}
+                            ? "今天的计划已完成。"
+                            : "今天，从一件事开始。"}
                       </h2>
                       <p>
-                        {remaining.length
-                          ? "一件一件来。让每一次专注，都成为看得见的进展。"
+                        {nextTask
+                          ? `下一项：${nextTask.title}${nextTask.start_time ? ` · ${nextTask.start_time}` : " · 时间待定"}`
+                          : remaining.length
+                            ? "今天的任务正在等待前置任务，先检查依赖关系。"
                           : complete.length
-                            ? "完成记录已留存。留些空间，也给自己一点休息。"
-                            : "还没有今天的安排。写下第一件想完成的事，开始自己的节奏。"}
+                            ? "完成记录已保存。你可以写下今天的复盘。"
+                            : "还没有今天的安排，添加一项任务即可开始。"}
                       </p>
                       <div className="hero-bottom">
-                        <span>
-                          <CheckCheck size={16} />
-                          已完成 <strong>{complete.length}</strong> 项
-                        </span>
-                        <span>
-                          <Clock3 size={16} />
-                          计划投入 <strong>{hours(plannedMinutes)}</strong> 小时
-                        </span>
-                        <button onClick={() => navigate("calendar")}>
-                          查看日历
-                          <ArrowUpRight size={16} />
-                        </button>
+                        <div className="hero-stat">
+                          <small>COMPLETED</small>
+                          <strong>{complete.length}<span> / {remaining.length + complete.length}</span></strong>
+                          <span>已完成任务</span>
+                        </div>
+                        <div className="hero-stat">
+                          <small>PLANNED</small>
+                          <strong>{hours(plannedMinutes)}<span> h</span></strong>
+                          <span>今日计划时长</span>
+                        </div>
+                        <div className="hero-stat">
+                          <small>PROJECTS</small>
+                          <strong>{activeProjects.length}</strong>
+                          <span>进行中项目</span>
+                        </div>
                       </div>
                     </div>
                     <div className="hero-progress">
@@ -703,6 +714,9 @@ export default function Home() {
                         {complete.length} / {remaining.length + complete.length}{" "}
                         TASKS
                       </p>
+                      <button onClick={() => navigate("calendar")}>
+                        查看日历 <ArrowUpRight size={14} />
+                      </button>
                     </div>
                     <div className="hero-decoration" />
                   </section>
@@ -937,6 +951,45 @@ export default function Home() {
                             </button>
                           </>
                         )}
+                      </section>
+                      <section className="panel day-map">
+                        <div className="panel-heading">
+                          <div>
+                            <span className="eyebrow">TIME BLOCKS</span>
+                            <h2>今日时间表</h2>
+                          </div>
+                          <Clock3 size={17} />
+                        </div>
+                        {timedTasks.length ? (
+                          <div className="day-map-list">
+                            {timedTasks.slice(0, 4).map((t) => (
+                              <button
+                                className={t.id === nextTask?.id ? "next" : ""}
+                                key={t.id}
+                                onClick={() => editTask(t)}
+                              >
+                                <time>{t.start_time}</time>
+                                <span>
+                                  {t.title}
+                                  <small>{t.end_time || `${t.estimated_duration} 分钟`}</small>
+                                </span>
+                              </button>
+                            ))}
+                            {timedTasks.length > 4 && (
+                              <span className="day-map-more">
+                                还有 {timedTasks.length - 4} 项 · 在日历中查看
+                              </span>
+                            )}
+                          </div>
+                        ) : (
+                          <p className="day-map-empty">今天没有设定具体时间的任务。</p>
+                        )}
+                        <button
+                          className="day-map-link"
+                          onClick={() => navigate("calendar")}
+                        >
+                          查看完整日历 <ArrowUpRight size={14} />
+                        </button>
                       </section>
                       <section className="panel deadlines-panel">
                         <div className="panel-heading">

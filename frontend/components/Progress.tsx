@@ -75,7 +75,7 @@ export function ProgressRing({
 
 export function ProjectPath({
   project,
-  color = "#5369ed",
+  color = "#315e70",
   compact = false,
 }: {
   project: ProjectProgress;
@@ -149,7 +149,7 @@ export function OverallProgress({
     ),
     ...progress.standalone_projects.map((p) => ({
       ...p,
-      color: "#5369ed",
+      color: "#315e70",
       goal: "独立项目",
     })),
   ].filter((p) => p.status !== "archived");

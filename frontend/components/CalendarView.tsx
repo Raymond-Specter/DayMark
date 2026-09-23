@@ -225,7 +225,7 @@ export default function CalendarView({
                 : info.event.endStr.slice(0, 16),
               all_day: info.event.allDay,
               description: info.event.extendedProps.description || "",
-              color: info.event.backgroundColor || "#5369ed",
+              color: info.event.backgroundColor || "#315e70",
             };
             edit({ kind: "event", item: event });
           }

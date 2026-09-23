@@ -54,7 +54,7 @@ export default function Editor({
         date: data.today,
         priority: 2,
         status: "active",
-        color: "#5369ed",
+        color: "#315e70",
         estimated_duration: 30,
         frequency: "daily",
         interval: 1,
