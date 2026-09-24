@@ -20,12 +20,17 @@
 
 .cinematic-today__art {
   z-index: -2;
-  background-image: url('/images/daymark-cinematic-hero.webp');
+  background-image: url('/images/gargantua-poster.jpg');
   background-size: cover;
   background-position: center;
-  filter: brightness(.64) saturate(.78);
-  animation: cinematic-today-pan 28s ease-in-out infinite alternate;
-  transform: scale(1.04);
+  filter: brightness(.6) saturate(.8);
+}
+
+.cinematic-today__art video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
 }
 
 .cinematic-today__bottom-blur {
@@ -144,16 +149,6 @@
 }
 
 .cinematic-today__title span { font-weight: 620; }
-
-.cinematic-today__description {
-  max-width: 640px;
-  color: #e3e4e9;
-  font-size: clamp(14px, 1.35vw, 17px);
-  font-weight: 350;
-  line-height: 1.8;
-  text-shadow: 0 1px 12px #000a;
-  overflow-wrap: anywhere;
-}
 
 .cinematic-today__actions {
   display: flex;
@@ -358,11 +353,6 @@
   to { opacity: 1; filter: blur(0); transform: translateY(0); }
 }
 
-@keyframes cinematic-today-pan {
-  from { transform: scale(1.04) translateX(-1%); }
-  to { transform: scale(1.1) translateX(1%); }
-}
-
 @keyframes cinematic-today-arrow {
   0%, 100% { transform: translateY(0); }
   50% { transform: translateY(3px); }
@@ -385,6 +375,7 @@
     padding: 24px 22px 26px;
   }
   .cinematic-today__art { background-position: 57% center; filter: brightness(.55) saturate(.72); }
+  .cinematic-today__art video { object-position: 57% center; }
   .cinematic-today__edition { font-size: 9px; gap: 8px; }
   .cinematic-today__edition-mark { width: 9px; height: 9px; }
   .cinematic-today__date { font-size: 10px; gap: 5px; }
@@ -398,7 +389,6 @@
   }
   .cinematic-today .cinematic-today__title { margin: 16px 0 11px; font-size: clamp(41px, 10vw, 58px); line-height: 1.2; }
   .cinematic-today__eyebrow { font-size: 10px; }
-  .cinematic-today__description { font-size: 13px; line-height: 1.7; }
   .cinematic-today__actions { margin-top: 22px; }
   .cinematic-today__primary, .cinematic-today__secondary { min-height: 43px; padding: 0 17px; font-size: 11px; }
   .cinematic-today__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
@@ -426,6 +416,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .cinematic-today__art, .cinematic-today__scroll svg { animation: none; }
+  .cinematic-today__art video { display: none; }
+  .cinematic-today__scroll svg { animation: none; }
   .cinematic-today__enter { opacity: 1; animation: none; }
 }

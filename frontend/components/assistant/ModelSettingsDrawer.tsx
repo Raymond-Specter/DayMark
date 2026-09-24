@@ -1,4 +1,5 @@
 "use client";
+import { uiText, uiFormat } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { aiRequest, type ModelSettings } from "@/lib/ai";
@@ -55,19 +56,18 @@ export default function ModelSettingsDrawer({
       <form onSubmit={save}>
         <div className="ai-drawer-heading">
           <div>
-            <span className="eyebrow">AI PROVIDERS</span>
-            <h2>模型设置</h2>
+            <h2>{uiText("模型设置")}</h2>
           </div>
           <button
             type="button"
             className="icon-button"
-            aria-label="关闭模型设置"
+            aria-label={uiText("关闭模型设置")}
             onClick={close}
           >
             <X size={20} />
           </button>
         </div>
-        <p>设置保存在本机，下次对话自动沿用。每次仅生成一个回答。</p>
+        <p>{uiText("设置保存在本机，下次对话自动沿用。每次仅生成一个回答。")}</p>
         <div className="ai-key-panel">
           <label>
             DeepSeek API Key
@@ -76,20 +76,20 @@ export default function ModelSettingsDrawer({
               value={apiKey}
               autoComplete="off"
               spellCheck={false}
-              placeholder={deepseekConfigured ? "已配置 · 输入新 Key 可替换" : "粘贴你的 DeepSeek API Key"}
+              placeholder={deepseekConfigured ? uiText("已配置 · 输入新 Key 可替换") : uiText("粘贴你的 DeepSeek API Key")}
               onChange={(event) => setApiKey(event.target.value)}
             />
           </label>
           <small className={deepseekConfigured ? "configured" : ""}>
-            {deepseekConfigured ? "✓ 已配置，仅保存在本机项目 .env" : "未配置。Key 不会显示在页面、数据库或聊天记录中。"}
+            {deepseekConfigured ? uiText("✓ 已配置，仅保存在本机项目 .env") : uiText("未配置。Key 不会显示在页面、数据库或聊天记录中。")}
           </small>
         </div>
         <label>
           AI Mode
           <select value={draft.mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as ModelSettings["mode"] })}>
-            <option value="auto">Auto · DeepSeek 优先，安全时本地降级</option>
-            <option value="deepseek">DeepSeek · 仅云端</option>
-            <option value="local">Local Qwen · 仅本地</option>
+            <option value="auto">{uiText("Auto · DeepSeek 优先，安全时本地降级")}</option>
+            <option value="deepseek">{uiText("DeepSeek · 仅云端")}</option>
+            <option value="local">{uiText("Local Qwen · 仅本地")}</option>
           </select>
         </label>
         <label>
@@ -127,7 +127,7 @@ export default function ModelSettingsDrawer({
               ))}
           </select>
         </label>
-        <small>8GB 显存默认 8192；出现显存压力时可降至 4096。</small>
+        <small>{uiText("8GB 显存默认 8192；出现显存压力时可降至 4096。")}</small>
         <label>
           Temperature · {draft.temperature}
           <input
@@ -149,12 +149,12 @@ export default function ModelSettingsDrawer({
               setDraft({ ...draft, think: e.target.value === "true" })
             }
           >
-            <option value="false">Off · 日常对话</option>
-            <option value="true">On · 更多思考时间</option>
+            <option value="false">{uiText("Off · 日常对话")}</option>
+            <option value="true">{uiText("On · 更多思考时间")}</option>
           </select>
         </label>
         <small>
-          开启后仍只显示最终回答，不展示内部推理内容；可能需要更长等待时间。
+          {uiText("开启后仍只显示最终回答，不展示内部推理内容；可能需要更长等待时间。")}
         </small>
         {error && (
           <p className="ai-error" role="alert">
@@ -162,7 +162,7 @@ export default function ModelSettingsDrawer({
           </p>
         )}
         <button className="button primary" disabled={busy}>
-          {busy ? "保存中…" : apiKey.trim() ? "保存 Key 与设置" : "保存设置"}
+          {busy ? uiText("保存中…") : apiKey.trim() ? uiText("保存 Key 与设置") : uiText("保存设置")}
         </button>
       </form>
     </dialog>

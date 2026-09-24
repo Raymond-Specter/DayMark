@@ -1,3 +1,4 @@
+import { uiText, uiFormat } from "@/lib/i18n";
 import {
   Check,
   Clock3,
@@ -44,9 +45,9 @@ export default function TaskRow({
     >
       <button
         className={`task-check ${completed ? "checked" : ""}`}
-        aria-label={completed ? `重新打开 ${task.title}` : `完成 ${task.title}`}
+        aria-label={completed ? uiFormat("重新打开 {0}", task.title) : uiFormat("完成 {0}", task.title)}
         disabled={busy || (!completed && task.blocked) || cancelled}
-        title={task.blocked ? task.blocked_reason || "依赖任务尚未完成" : ""}
+        title={task.blocked ? task.blocked_reason || uiText("依赖任务尚未完成") : ""}
         onClick={() => action(task, completed ? "reopen" : "complete")}
       >
         {completed && <Check size={13} strokeWidth={3} />}
@@ -72,13 +73,13 @@ export default function TaskRow({
             <Clock3 size={12} />
             {task.start_time
               ? `${task.start_time}${task.end_time ? `–${task.end_time}` : ""}`
-              : "时间待定"}
+              : uiText("时间待定")}
           </span>
-          <span>{task.estimated_duration} 分钟</span>
-          {task.routine_id && (
+          {(!task.start_time || !task.end_time) && <span>{task.estimated_duration} {uiText("分钟")}</span>}
+          {task.routine_id && !overdueActions && (
             <span>
               <Repeat2 size={12} />
-              重复
+              {uiText("重复")}
             </span>
           )}
           {task.status !== "pending" && (
@@ -91,19 +92,15 @@ export default function TaskRow({
           <div className="dependency-hint">
             <Link2 size={11} />
             {task.blocked_reason ||
-              `等待：${task.dependency_title || "前置任务"}`}
+              uiFormat("等待：{0}", task.dependency_title || "前置任务")}
           </div>
         )}
         {overdueActions && (
           <div className="unfinished-actions">
             <button onClick={() => action(task, "reschedule", data.today)}>
-              移至今天
+              {uiText("移至今天")}
             </button>
-            <button onClick={() => reschedule(task)}>选择日期</button>
-            <button onClick={() => action(task, "cancel")}>标记取消</button>
-            <button onClick={() => action(task, "keep_overdue")}>
-              保留逾期
-            </button>
+            <button onClick={() => reschedule(task)}>{uiText("选择日期")}</button>
           </div>
         )}
       </div>
@@ -112,13 +109,17 @@ export default function TaskRow({
         title={priorityLabel(task.priority)}
       >
         <Flag size={11} fill="currentColor" />
-        {["", "高", "中", "低"][task.priority]}
+        {["", uiText("高"), uiText("中"), uiText("低")][task.priority]}
       </span>
       <details className="task-menu">
-        <summary className="icon-button" aria-label={`更多操作 ${task.title}`}>
+        <summary className="icon-button" aria-label={uiFormat("更多操作 {0}", task.title)}>
           <MoreHorizontal size={18} />
         </summary>
         <div className="dropdown-menu">
+          {overdueActions && <button onClick={(e) => {
+            e.currentTarget.closest("details")?.removeAttribute("open");
+            action(task, "keep_overdue");
+          }}>{uiText("保留逾期")}</button>}
           <button
             onClick={(e) => {
               e.currentTarget.closest("details")?.removeAttribute("open");
@@ -126,7 +127,7 @@ export default function TaskRow({
             }}
           >
             <Pencil size={14} />
-            编辑任务
+            {uiText("编辑任务")}
           </button>
           <button
             onClick={(e) => {
@@ -135,7 +136,7 @@ export default function TaskRow({
             }}
           >
             <CalendarDays size={14} />
-            重新安排日期
+            {uiText("重新安排日期")}
           </button>
           <button
             onClick={(e) => {
@@ -144,7 +145,7 @@ export default function TaskRow({
             }}
           >
             {completed || cancelled ? <RotateCcw size={14} /> : <X size={14} />}
-            {completed || cancelled ? "重新打开" : "取消任务"}
+            {completed || cancelled ? uiText("重新打开") : uiText("取消任务")}
           </button>
         </div>
       </details>

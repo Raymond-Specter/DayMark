@@ -1,4 +1,5 @@
 "use client";
+import { browserLocale, getLanguage, uiText, uiFormat } from "@/lib/i18n";
 import { useCallback, useEffect, useRef, useState } from "react";
 import FullCalendar from "@fullcalendar/react";
 import dayGridPlugin from "@fullcalendar/daygrid";
@@ -6,7 +7,7 @@ import timeGridPlugin from "@fullcalendar/timegrid";
 import interactionPlugin from "@fullcalendar/interaction";
 import zhLocale from "@fullcalendar/core/locales/zh-cn";
 import type { EventApi, EventInput } from "@fullcalendar/core";
-import { ChevronLeft, ChevronRight, Plus, CalendarDays } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { api, send, taskPayload, zonedInput } from "@/lib/api";
 import type {
   Bootstrap,
@@ -32,20 +33,16 @@ export default function CalendarView({
   const calendar = useRef<FullCalendar>(null);
   const [view, setView] = useState("timeGridWeek");
   const [title, setTitle] = useState("");
-  const [loading, setLoading] = useState(false);
   const fetchEvents = useCallback(async (
     info: { startStr: string; endStr: string },
     success: (events: EventInput[]) => void,
     failure: (error: Error) => void,
   ) => {
-    setLoading(true);
     try {
       success(await api<EventInput[]>(`/calendar?start=${info.startStr.slice(0, 10)}&end=${info.endStr.slice(0, 10)}`));
     } catch (e) {
       failure(e as Error);
       notify((e as Error).message, true);
-    } finally {
-      setLoading(false);
     }
   }, [notify]);
   useEffect(() => {
@@ -71,7 +68,7 @@ export default function CalendarView({
           !event.allDay &&
           event.startStr.slice(0, 10) !== event.endStr.slice(0, 10)
         )
-          throw new Error("任务暂不支持跨天，请在同一天安排开始和结束时间");
+          throw new Error(uiText("任务暂不支持跨天，请在同一天安排开始和结束时间"));
         await send(
           `/tasks/${task.id}`,
           {
@@ -102,7 +99,7 @@ export default function CalendarView({
           "PUT",
         );
       }
-      notify("日程已更新");
+      notify(uiText("日程已更新"));
       await changed();
     } catch (e) {
       revert();
@@ -115,19 +112,18 @@ export default function CalendarView({
       <div className="calendar-toolbar">
         <div className="calendar-controls">
           <div className="calendar-title">
-            <span>时间日历</span>
             <h2>{title}</h2>
           </div>
           <button
             className="icon-button"
-            aria-label="上一个日期范围"
+            aria-label={uiText("上一个日期范围")}
             onClick={() => calendar.current?.getApi().prev()}
           >
             <ChevronLeft size={19} />
           </button>
           <button
             className="icon-button"
-            aria-label="下一个日期范围"
+            aria-label={uiText("下一个日期范围")}
             onClick={() => calendar.current?.getApi().next()}
           >
             <ChevronRight size={19} />
@@ -136,22 +132,22 @@ export default function CalendarView({
             className="button secondary small"
             onClick={() => calendar.current?.getApi().gotoDate(data.today)}
           >
-            今天
+            {uiText("今天")}
           </button>
         </div>
         <div className="calendar-controls">
           <div className="segmented">
             {[
-              ["dayGridMonth", "月"],
-              ["timeGridWeek", "周"],
-              ["timeGridDay", "日"],
+              ["dayGridMonth", uiText("月")],
+              ["timeGridWeek", uiText("周")],
+              ["timeGridDay", uiText("日")],
             ].map(([value, text]) => (
               <button
                 key={value}
                 className={view === value ? "active" : ""}
                 onClick={() => switchView(value)}
               >
-                {text}
+                {uiText(text)}
               </button>
             ))}
           </div>
@@ -160,29 +156,15 @@ export default function CalendarView({
             onClick={() => edit({ kind: "event" })}
           >
             <Plus size={16} />
-            日历事件
+            {uiText("日历事件")}
           </button>
         </div>
-      </div>
-      <div className="calendar-caption">
-        <span>
-          <span className="dot blue" />
-          任务与日程 · 点击空白处添加任务
-        </span>
-        <span>
-          <CalendarDays size={14} />
-          拖动调整日期，拉伸调整时长
-        </span>
-        <span>
-          {data.settings.timezone}
-          {loading ? " · 同步中…" : ""}
-        </span>
       </div>
       <div className={`calendar-stage calendar-stage-${view}`}>
       <FullCalendar
         ref={calendar}
         plugins={[dayGridPlugin, timeGridPlugin, interactionPlugin]}
-        locale={zhLocale}
+        locale={getLanguage() === "zh" ? zhLocale : "en"}
         firstDay={1}
         initialDate={data.today}
         initialView="timeGridWeek"
@@ -202,18 +184,18 @@ export default function CalendarView({
         slotDuration="00:30:00"
         slotLabelInterval="01:00:00"
         slotLabelFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
-        allDayText="全天"
+        allDayText={uiText("全天")}
         dayHeaderContent={(info) =>
           info.view.type === "dayGridMonth" ? (
             info.text
           ) : (
             <span className={`calendar-day-head${info.isToday ? " is-today" : ""}`}>
-              <span>{new Intl.DateTimeFormat("zh-CN", { weekday: "short" }).format(info.date)}</span>
+              <span>{new Intl.DateTimeFormat(browserLocale(), { weekday: "short" }).format(info.date)}</span>
               <span className="calendar-day-number">{info.date.getDate()}</span>
             </span>
           )
         }
-        buttonText={{ today: "今天", month: "月", week: "周", day: "日" }}
+        buttonText={{ today: uiText("今天"), month: uiText("月"), week: uiText("周"), day: uiText("日") }}
         eventTimeFormat={{ hour: "2-digit", minute: "2-digit", hour12: false }}
         datesSet={(info) => setTitle(info.view.title)}
         events={fetchEvents}

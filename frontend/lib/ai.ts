@@ -1,4 +1,5 @@
 import { api } from "./api";
+import { uiText, uiFormat } from "./i18n";
 
 export interface ModelSettings {
   mode: "auto" | "deepseek" | "local";
@@ -101,7 +102,7 @@ export async function aiRequest<T>(
       error instanceof TypeError ||
       (error instanceof DOMException && error.name === "TimeoutError")
     )
-      throw new Error("无法连接 AI 后端或请求超时，请确认项目已启动。");
+      throw new Error(uiText("无法连接 AI 后端或请求超时，请确认项目已启动。"));
     throw error;
   }
 }
@@ -124,10 +125,10 @@ export async function streamChat(
     throw new Error(
       typeof body.detail === "string"
         ? body.detail
-        : `聊天请求失败（${response.status}）`,
+        : uiFormat("聊天请求失败（{0}）", response.status),
     );
   }
-  if (!response.body) throw new Error("浏览器无法读取流式回答。");
+  if (!response.body) throw new Error(uiText("浏览器无法读取流式回答。"));
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "",
@@ -155,7 +156,7 @@ export async function streamChat(
       }
     }
     if (!finished)
-      throw new Error("回答连接中断，请刷新历史查看已保存的部分内容。");
+      throw new Error(uiText("回答连接中断，请刷新历史查看已保存的部分内容。"));
   } finally {
     reader.releaseLock();
   }

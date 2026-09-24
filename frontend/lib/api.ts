@@ -1,11 +1,12 @@
 import type { Task } from "./types";
+import { browserLocale, uiText } from "./i18n";
 export async function api<T>(path: string, options?: RequestInit): Promise<T> {
   const response = await fetch(`/api${path}`, {
     ...options,
     headers: { "Content-Type": "application/json", ...options?.headers },
   });
   if (!response.ok) {
-    let message = `请求失败（${response.status}）`;
+    let message = `${uiText("请求失败")} (${response.status})`;
     try {
       const body = await response.json();
       message =
@@ -63,9 +64,9 @@ export function taskPayload(task: Task) {
   };
 }
 export const priorityLabel = (value: number) =>
-  ["", "高优先级", "中优先级", "低优先级"][value] || "中优先级";
+  uiText(["", "高优先级", "中优先级", "低优先级"][value] || "中优先级");
 export const statusLabel = (value: string) =>
-  ({
+  uiText(({
     pending: "待完成",
     completed: "已完成",
     overdue: "已逾期",
@@ -74,14 +75,14 @@ export const statusLabel = (value: string) =>
     active: "进行中",
     paused: "已暂停",
     archived: "已归档",
-  })[value] || value;
+  })[value] || value);
 export function localDate(value = new Date()) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
 }
 export function dateLabel(value: string | null, compact = false) {
-  if (!value) return "未安排日期";
+  if (!value) return uiText("未安排日期");
   return new Date(`${value.slice(0, 10)}T12:00:00`).toLocaleDateString(
-    "zh-CN",
+    browserLocale(),
     compact
       ? { month: "short", day: "numeric" }
       : { month: "long", day: "numeric", weekday: "long" },
@@ -91,7 +92,7 @@ export function hours(minutes: number) {
   return Number((minutes / 60).toFixed(1));
 }
 export function deadlineLabel(value: string, timezone: string) {
-  return new Date(value).toLocaleString("zh-CN", {
+  return new Date(value).toLocaleString(browserLocale(), {
     timeZone: timezone,
     month: "numeric",
     day: "numeric",
@@ -122,6 +123,6 @@ export function zonedISO(value: string, timezone: string) {
     candidate += intended - actualWall;
   }
   if (zonedInput(new Date(candidate).toISOString(), timezone) !== value)
-    throw new Error("该时间在所选时区不存在，请选择其他时间");
+    throw new Error(uiText("该时间在所选时区不存在，请选择其他时间"));
   return new Date(candidate).toISOString();
 }

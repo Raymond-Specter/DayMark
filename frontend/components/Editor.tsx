@@ -1,4 +1,5 @@
 "use client";
+import { uiText, uiFormat } from "@/lib/i18n";
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -139,34 +140,34 @@ export default function Editor({
   const projectSelect = () =>
     select(
       "project_id",
-      "所属项目",
+      uiText("所属项目"),
       [
-        ["", "独立任务 / 暂不归属"],
+        ["", uiText("独立任务 / 暂不归属")],
         ...data.projects.map((p) => [p.id, p.name] as [string, string]),
       ],
       kind === "milestone",
     );
   const milestoneSelect = () =>
-    select("milestone_id", "所属里程碑", [
-      ["", "暂不设置"],
+    select("milestone_id", uiText("所属里程碑"), [
+      ["", uiText("暂不设置")],
       ...data.milestones
         .filter((m) => m.project_id === str("project_id"))
         .map((m) => [m.id, m.name] as [string, string]),
     ]);
   const prioritySelect = () =>
-    select("priority", "优先级", [
-      ["1", "高 · 优先处理"],
-      ["2", "中 · 正常安排"],
-      ["3", "低 · 灵活安排"],
+    select("priority", uiText("优先级"), [
+      ["1", uiText("高 · 优先处理")],
+      ["2", uiText("中 · 正常安排")],
+      ["3", uiText("低 · 灵活安排")],
     ]);
   const reminderSelect = () =>
-    select("reminder", "任务提醒", [
-      ["", "不提醒"],
-      ["0", "准时提醒"],
-      ["10", "提前 10 分钟"],
-      ["30", "提前 30 分钟"],
-      ["60", "提前 1 小时"],
-      ["1440", "提前 1 天"],
+    select("reminder", uiText("任务提醒"), [
+      ["", uiText("不提醒")],
+      ["0", uiText("准时提醒")],
+      ["10", uiText("提前 10 分钟")],
+      ["30", uiText("提前 30 分钟")],
+      ["60", uiText("提前 1 小时")],
+      ["1440", uiText("提前 1 天")],
     ]);
 
   async function submit(event: React.FormEvent) {
@@ -204,14 +205,14 @@ export default function Editor({
           const startTime = nullable("start_time");
           const endTime = nullable("end_time");
           if (Boolean(startTime) !== Boolean(endTime))
-            throw new Error("开始时间和结束时间需要同时填写");
+            throw new Error(uiText("开始时间和结束时间需要同时填写"));
           let estimatedDuration = 0;
           if (startTime && endTime) {
             const [startHour, startMinute] = startTime.split(":").map(Number);
             const [endHour, endMinute] = endTime.split(":").map(Number);
             estimatedDuration = endHour * 60 + endMinute - startHour * 60 - startMinute;
             if (estimatedDuration <= 0)
-              throw new Error("结束时间必须晚于开始时间");
+              throw new Error(uiText("结束时间必须晚于开始时间"));
           }
           payload = {
             title: str("title"),
@@ -265,10 +266,10 @@ export default function Editor({
         payload,
         item ? "PUT" : "POST",
       );
-      await saved(`${names[kind]}已${item ? "更新" : "创建"}`);
+      await saved(uiFormat("{0}已{1}", uiText(names[kind]), item ? uiText("更新") : uiText("创建")));
       close();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "保存失败，请重试");
+      setError(e instanceof Error ? e.message : uiText("保存失败，请重试"));
     } finally {
       setBusy(false);
     }
@@ -277,7 +278,7 @@ export default function Editor({
     if (
       !item ||
       !window.confirm(
-        `删除“${str("title") || str("name")}”？有关联内容的目标、项目和里程碑需要先移除关联。任务删除后会保留历史记录。`,
+        uiFormat("删除“{0}”？有关联内容的目标、项目和里程碑需要先移除关联。任务删除后会保留历史记录。", str("title") || str("name")),
       )
     )
       return;
@@ -288,7 +289,7 @@ export default function Editor({
         `/${resources[kind]}/${item.id}${kind === "task" || kind === "routine" ? `?version=${num("version")}` : ""}`,
         { method: "DELETE" },
       );
-      await saved(`${names[kind]}已删除`);
+      await saved(uiFormat("{0}已删除", uiText(names[kind])));
       close();
     } catch (e) {
       setError((e as Error).message);
@@ -315,7 +316,7 @@ export default function Editor({
         action,
         version: num("version"),
       });
-      await saved(action === "complete" ? "完成记录已保存" : "任务已重新打开");
+      await saved(action === "complete" ? uiText("完成记录已保存") : uiText("任务已重新打开"));
       close();
     } catch (e) {
       setError((e as Error).message);
@@ -349,15 +350,14 @@ export default function Editor({
           )}
         </div>
         <div>
-          <p className="eyebrow">YOUR PLAN, YOUR PACE</p>
           <h2>
-            {item ? "编辑" : "新建"}
-            {names[kind]}
+            {item ? uiText("编辑") : uiText("新建")}
+            {uiText(names[kind])}
           </h2>
         </div>
         <button
           className="icon-button close-dialog"
-          aria-label="关闭"
+          aria-label={uiText("关闭")}
           onClick={close}
           disabled={busy}
         >
@@ -367,54 +367,54 @@ export default function Editor({
       <form onSubmit={submit}>
         <div className="dialog-body">
           {kind === "task" || kind === "event"
-            ? field("title", "名称", "text", true, {
+            ? field("title", uiText("名称"), "text", true, {
                 maxLength: 200,
-                placeholder: "给这件事起个清晰的名字",
+                placeholder: uiText("给这件事起个清晰的名字"),
               })
-            : field("name", "名称", "text", true, {
+            : field("name", uiText("名称"), "text", true, {
                 maxLength: 200,
-                placeholder: "你想推进的事情",
+                placeholder: uiText("你想推进的事情"),
               })}
           <label className="field">
-            <span>描述 / 备注</span>
+            <span>{uiText("描述 / 备注")}</span>
             <textarea
               rows={3}
               value={str("description")}
               onChange={(e) => set("description", e.target.value)}
               maxLength={10000}
-              placeholder="可选：记录背景、完成标准或需要的材料"
+              placeholder={uiText("可选：记录背景、完成标准或需要的材料")}
             />
           </label>
           {(kind === "goal" || kind === "project" || kind === "milestone") && (
             <>
               {kind === "project" &&
-                select("goal_id", "所属目标", [
-                  ["", "独立项目"],
+                select("goal_id", uiText("所属目标"), [
+                  ["", uiText("独立项目")],
                   ...data.goals.map((g) => [g.id, g.name] as [string, string]),
                 ])}
               {kind === "milestone" && projectSelect()}
               <div className="form-grid">
-                {field("start_date", "开始日期", "date")}
+                {field("start_date", uiText("开始日期"), "date")}
                 {field(
                   kind === "goal"
                     ? "target_date"
                     : kind === "project"
                       ? "end_date"
                       : "deadline",
-                  "目标日期",
+                  uiText("目标日期"),
                   "date",
                 )}
               </div>
               <div className="form-grid">
-                {select("status", "状态", [
-                  ["active", "进行中"],
-                  ["paused", "已暂停"],
-                  ["completed", "已完成"],
-                  ["archived", "已归档"],
+                {select("status", uiText("状态"), [
+                  ["active", uiText("进行中")],
+                  ["paused", uiText("已暂停")],
+                  ["completed", uiText("已完成")],
+                  ["archived", uiText("已归档")],
                 ])}
                 {kind === "goal" && prioritySelect()}
               </div>
-              {kind === "goal" && field("color", "目标颜色", "color")}
+              {kind === "goal" && field("color", uiText("目标颜色"), "color")}
             </>
           )}
           {kind === "task" && (
@@ -424,22 +424,22 @@ export default function Editor({
                 {milestoneSelect()}
               </div>
               <div className="form-divider">
-                <Clock3 size={15} /> 时间安排{" "}
+                <Clock3 size={15} /> {uiText("时间安排")}{" "}
                 <span>{data.settings.timezone}</span>
               </div>
-              {field("date", "计划日期", "date")}
+              {field("date", uiText("计划日期"), "date")}
               <div className="form-grid">
-                {field("start_time", "开始时间", "time")}
-                {field("end_time", "结束时间", "time")}
+                {field("start_time", uiText("开始时间"), "time")}
+                {field("end_time", uiText("结束时间"), "time")}
               </div>
               <div className="form-grid">
-                {field("deadline", "截止时间", "datetime-local")}
+                {field("deadline", uiText("截止时间"), "datetime-local")}
                 {prioritySelect()}
               </div>
               <div className="form-grid">
                 {reminderSelect()}
-                {select("depends_on_task_id", "依赖任务（先完成）", [
-                  ["", "没有依赖"],
+                {select("depends_on_task_id", uiText("依赖任务（先完成）"), [
+                  ["", uiText("没有依赖")],
                   ...data.tasks
                     .filter(
                       (t) => t.id !== item?.id && t.status !== "cancelled",
@@ -454,21 +454,21 @@ export default function Editor({
                 ])}
               </div>
               <p className="form-hint">
-                预计用时会根据开始时间和结束时间自动计算。未设置时间时，按每日默认开始时间提醒。依赖未完成的任务会显示等待状态。
+                {uiText("预计用时会根据开始时间和结束时间自动计算。未设置时间时，按每日默认开始时间提醒。依赖未完成的任务会显示等待状态。")}
               </p>
               {item && (
                 <div className="record-meta">
-                  <span>状态：{statusLabel(str("status"))}</span>
+                  <span>{uiText("状态：")}{statusLabel(str("status"))}</span>
                   <span>
-                    来源：
-                    {str("source") === "routine" ? "重复任务" : "手动创建"}
+                    {uiText("来源：")}
+                    {str("source") === "routine" ? uiText("重复任务") : uiText("手动创建")}
                   </span>
                   <button
                     type="button"
                     className="text-button"
                     onClick={showHistory}
                   >
-                    查看变更记录
+                    {uiText("查看变更记录")}
                   </button>
                 </div>
               )}
@@ -480,18 +480,18 @@ export default function Editor({
                         <span>
                           {(
                             {
-                              created: "创建",
-                              updated: "修改",
-                              completed: "完成",
-                              reopened: "重新打开",
-                              rescheduled: "改期",
-                              cancelled: "取消",
-                              deleted: "删除",
-                              complete: "完成",
-                              reopen: "重新打开",
-                              reschedule: "改期",
-                              cancel: "取消",
-                              keep_overdue: "保留逾期",
+                              created: uiText("创建"),
+                              updated: uiText("修改"),
+                              completed: uiText("完成"),
+                              reopened: uiText("重新打开"),
+                              rescheduled: uiText("改期"),
+                              cancelled: uiText("取消"),
+                              deleted: uiText("删除"),
+                              complete: uiText("完成"),
+                              reopen: uiText("重新打开"),
+                              reschedule: uiText("改期"),
+                              cancel: uiText("取消"),
+                              keep_overdue: uiText("保留逾期"),
                             } as Record<string, string>
                           )[h.action] || h.action}
                         </span>
@@ -503,7 +503,7 @@ export default function Editor({
                       </div>
                     ))
                   ) : (
-                    <p>尚无变更记录</p>
+                    <p>{uiText("尚无变更记录")}</p>
                   )}
                 </div>
               )}
@@ -516,38 +516,38 @@ export default function Editor({
                 {milestoneSelect()}
               </div>
               <div className="form-divider">
-                <Repeat2 size={15} /> 重复规则
+                <Repeat2 size={15} /> {uiText("重复规则")}
               </div>
-              {select("frequency", "重复频率", [
-                ["daily", "每天 · Daily"],
-                ["every_n_days", "每 N 天 · Every N Days"],
-                ["weekly", "每周 · Weekly"],
-                ["weekdays", "指定星期 · Specific Weekdays"],
-                ["custom", "自定义间隔 · Custom Interval"],
+              {select("frequency", uiText("重复频率"), [
+                ["daily", uiText("每天 · Daily")],
+                ["every_n_days", uiText("每 N 天 · Every N Days")],
+                ["weekly", uiText("每周 · Weekly")],
+                ["weekdays", uiText("指定星期 · Specific Weekdays")],
+                ["custom", uiText("自定义间隔 · Custom Interval")],
               ])}
               {str("frequency") !== "daily" && (
                 <div className="form-grid">
                   {field(
                     "interval",
                     ["weekly", "weekdays"].includes(str("frequency"))
-                      ? "每隔几周"
-                      : "间隔",
+                      ? uiText("每隔几周")
+                      : uiText("间隔"),
                     "number",
                     true,
                     { min: 1, max: 365 },
                   )}
                   {str("frequency") === "custom" &&
-                    select("interval_unit", "间隔单位", [
-                      ["days", "天"],
-                      ["weeks", "周"],
+                    select("interval_unit", uiText("间隔单位"), [
+                      ["days", uiText("天")],
+                      ["weeks", uiText("周")],
                     ])}
                 </div>
               )}
               {str("frequency") === "weekdays" && (
                 <fieldset className="weekday-field">
-                  <legend>重复星期</legend>
+                  <legend>{uiText("重复星期")}</legend>
                   <div>
-                    {["一", "二", "三", "四", "五", "六", "日"].map(
+                    {[uiText("一"), uiText("二"), uiText("三"), uiText("四"), uiText("五"), uiText("六"), uiText("日")].map(
                       (day, index) => (
                         <label
                           key={day}
@@ -582,22 +582,22 @@ export default function Editor({
               )}
               {str("frequency") === "weekly" && (
                 <p className="form-hint">
-                  从开始日期起，每隔 {num("interval")} 周的同一天生成任务。
+                  {uiText("从开始日期起，每隔")} {num("interval")} {uiText("周的同一天生成任务。")}
                 </p>
               )}
               <p className="form-hint">
-                名称可使用 {"{n}"} 自动编号、{"{date}"}{" "}
-                插入原始日期；单次改期不会改变编号。
+                {uiText("名称可使用")} {"{n}"} {uiText("自动编号、")}{"{date}"}{" "}
+                {uiText("插入原始日期；单次改期不会改变编号。")}
               </p>
               <div className="form-grid">
-                {field("start_date", "开始日期", "date", true)}
-                {field("end_date", "结束日期（可不填）", "date")}
+                {field("start_date", uiText("开始日期"), "date", true)}
+                {field("end_date", uiText("结束日期（可不填）"), "date")}
               </div>
               <div className="form-grid">
-                {field("preferred_time", "默认开始时间", "time")}
+                {field("preferred_time", uiText("默认开始时间"), "time")}
                 {field(
                   "estimated_duration",
-                  "预计用时（分钟）",
+                  uiText("预计用时（分钟）"),
                   "number",
                   true,
                   { min: 1, max: 1440 },
@@ -608,23 +608,22 @@ export default function Editor({
                 {reminderSelect()}
               </div>
               <div className="form-divider">
-                <ArrowRight size={15} /> 简单依赖
+                <ArrowRight size={15} /> {uiText("简单依赖")}
               </div>
-              {select("depends_on_routine_id", "依赖的重复任务", [
-                ["", "没有依赖"],
+              {select("depends_on_routine_id", uiText("依赖的重复任务"), [
+                ["", uiText("没有依赖")],
                 ...data.routines
                   .filter((r) => r.id !== item?.id)
                   .map((r) => [r.id, r.name] as [string, string]),
               ])}
               {str("depends_on_routine_id") && (
                 <>
-                  {field("offset_days", "依赖前几天的任务", "number", true, {
+                  {field("offset_days", uiText("依赖前几天的任务"), "number", true, {
                     min: 0,
                     max: 365,
                   })}
                   <p className="form-hint">
-                    填 1
-                    表示：今天生成的任务依赖所选重复规则在昨天生成的任务。请让本规则开始日期至少晚于依赖规则相应天数。
+                    {uiText("填 1 表示：今天生成的任务依赖所选重复规则在昨天生成的任务。请让本规则开始日期至少晚于依赖规则相应天数。")}
                   </p>
                 </>
               )}
@@ -634,10 +633,10 @@ export default function Editor({
                   checked={Boolean(values.active)}
                   onChange={(e) => set("active", e.target.checked)}
                 />
-                <span>启用规则，自动生成任务</span>
+                <span>{uiText("启用规则，自动生成任务")}</span>
               </label>
               <p className="form-hint">
-                修改规则会更新尚未修改的未来任务；完成记录和手动调整会保留。
+                {uiText("修改规则会更新尚未修改的未来任务；完成记录和手动调整会保留。")}
               </p>
             </>
           )}
@@ -659,26 +658,26 @@ export default function Editor({
                     }));
                   }}
                 />
-                全天事件
+                {uiText("全天事件")}
               </label>
               <div className="form-grid">
                 {field(
                   "start",
-                  "开始",
+                  uiText("开始"),
                   values.all_day ? "date" : "datetime-local",
                   true,
                 )}
                 {field(
                   "end",
-                  values.all_day ? "结束（不含当日）" : "结束",
+                  values.all_day ? uiText("结束（不含当日）") : uiText("结束"),
                   values.all_day ? "date" : "datetime-local",
                   true,
                 )}
               </div>
-              {field("color", "事件颜色", "color")}
+              {field("color", uiText("事件颜色"), "color")}
               <p className="form-hint">
-                独立日历事件用于安排时间，不计入任务完成率。时间按{" "}
-                {data.settings.timezone} 记录。
+                {uiText("独立日历事件用于安排时间，不计入任务完成率。时间按")}{" "}
+                {data.settings.timezone} {uiText("记录。")}
               </p>
             </>
           )}
@@ -697,7 +696,7 @@ export default function Editor({
               onClick={remove}
             >
               <Trash2 size={16} />
-              删除
+              {uiText("删除")}
             </button>
           )}
           {item && kind === "task" && (
@@ -713,8 +712,8 @@ export default function Editor({
             >
               <CheckCircle2 size={15} />
               {["completed", "cancelled"].includes(str("status"))
-                ? "重新打开"
-                : "标记完成"}
+                ? uiText("重新打开")
+                : uiText("标记完成")}
             </button>
           )}
           <div className="dialog-foot-spacer" />
@@ -724,10 +723,10 @@ export default function Editor({
             onClick={close}
             disabled={busy}
           >
-            取消
+            {uiText("取消")}
           </button>
           <button className="button primary" type="submit" disabled={busy}>
-            {busy ? "正在保存…" : item ? "保存修改" : `创建${names[kind]}`}
+            {busy ? uiText("正在保存…") : item ? uiText("保存修改") : uiFormat("创建{0}", uiText(names[kind]))}
             <ArrowRight size={16} />
           </button>
         </div>

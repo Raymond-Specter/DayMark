@@ -1,4 +1,5 @@
 "use client";
+import { uiText, uiFormat } from "@/lib/i18n";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -143,7 +144,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
   }
   async function send() {
     const pendingAttachments = attachments;
-    const text = input.trim() || (pendingAttachments.length ? "请阅读并分析附件。" : "");
+    const text = input.trim() || (pendingAttachments.length ? uiText("请阅读并分析附件。") : "");
     if (!text || sending.current || loadingHistory || uploading) return;
     sending.current = true;
     setBusy(true);
@@ -194,25 +195,25 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             accepted = true;
             if (event.context_trimmed)
               setNotice(
-                "本次回答使用最近的完整对话；更早的聊天记录仍完整保存在历史中。",
+                uiText("本次回答使用最近的完整对话；更早的聊天记录仍完整保存在历史中。"),
               );
             return;
           }
           if (event.event === "tool_status") {
-            setActionStatus((old) => [...old, event.message || "正在执行操作…"]);
+            setActionStatus((old) => [...old, event.message || uiText("正在执行操作…")]);
             return;
           }
           if (event.event === "tool_result") {
             setActionStatus((old) => [
               ...old,
-              `${event.success ? "✓" : "!"} ${event.message || "操作已处理"}`,
+              `${event.success ? "✓" : "!"} ${event.message || uiText("操作已处理")}`,
             ]);
             if (event.confirmation) setConfirmation(event.confirmation);
             if (event.affected_entities?.length) changed?.();
             return;
           }
           if (event.event === "provider_status") {
-            if (event.fallback) setNotice(event.message || "已切换到本地模型。");
+            if (event.fallback) setNotice(event.message || uiText("已切换到本地模型。"));
             return;
           }
           setMessages((old) =>
@@ -234,20 +235,20 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             ),
           );
           if (event.event === "error")
-            setError(event.error || "模型生成失败，请重试。");
+            setError(event.error || uiText("模型生成失败，请重试。"));
           if (event.confirmation) setConfirmation(event.confirmation);
           if (event.affected_entities?.length) changed?.();
         },
       );
     } catch (e) {
       if (!accepted) {
-        setInput(text === "请阅读并分析附件。" ? "" : text);
+        setInput(text === uiText("请阅读并分析附件。") ? "" : text);
         setAttachments(pendingAttachments);
       }
       if (!(e instanceof DOMException && e.name === "AbortError"))
         setError(
           e instanceof TypeError
-            ? "聊天连接中断，请确认后端已启动。"
+            ? uiText("聊天连接中断，请确认后端已启动。")
             : (e as Error).message,
         );
     } finally {
@@ -259,7 +260,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           );
           setMessages(detail.messages);
         } catch {
-          setNotice("暂时无法刷新聊天记录，请稍后重新打开此会话。");
+          setNotice(uiText("暂时无法刷新聊天记录，请稍后重新打开此会话。"));
         }
       }
       sending.current = false;
@@ -284,11 +285,11 @@ export default function Assistant({ changed }: { changed?: () => void }) {
   }
   async function upload(file: File) {
     if (attachments.length >= 3) {
-      setError("每条消息最多上传 3 个文件。");
+      setError(uiText("每条消息最多上传 3 个文件。"));
       return;
     }
     if (file.size > 10 * 1024 * 1024) {
-      setError("文件不能超过 10 MB。");
+      setError(uiText("文件不能超过 10 MB。"));
       return;
     }
     setUploading(true);
@@ -301,7 +302,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       );
       if (!response.ok) {
         const body = await response.json().catch(() => ({}));
-        throw new Error(typeof body.detail === "string" ? body.detail : `上传失败（${response.status}）`);
+        throw new Error(typeof body.detail === "string" ? body.detail : uiFormat("上传失败（{0}）", response.status));
       }
       const attachment = (await response.json()) as ChatAttachment;
       setAttachments((old) => [...old, attachment]);
@@ -393,7 +394,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                   : mode === "auto" && !deepseek?.online
                     ? "Auto · Local Qwen fallback"
                     : "DeepSeek Cloud Ready"
-                : "当前模式不可用"}
+                : uiText("当前模式不可用")}
             </span>
           </div>
         </div>
@@ -408,8 +409,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           </label>
           <button
             className="icon-button"
-            title="刷新模型状态"
-            aria-label="刷新模型状态"
+            title={uiText("刷新模型状态")}
+            aria-label={uiText("刷新模型状态")}
             onClick={refreshHealth}
           >
             <RefreshCw size={17} />
@@ -420,7 +421,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             disabled={!health || busy}
           >
             <Settings2 size={16} />
-            模型设置
+            {uiText("模型设置")}
           </button>
         </div>
       </div>
@@ -428,9 +429,9 @@ export default function Assistant({ changed }: { changed?: () => void }) {
         <div className="ai-offline" role="status">
           <strong>{healthError || (mode === "deepseek" ? deepseek?.error : local?.error)}</strong>
           <span>
-            {mode === "deepseek" ? "请打开“模型设置”，填写 DeepSeek API Key 后保存。" : <>在项目目录运行 <code>.\scripts\setup_ollama.ps1 -Start</code>。</>}
+            {mode === "deepseek" ? uiText("请打开“模型设置”，填写 DeepSeek API Key 后保存。") : <>{uiText("在项目目录运行")} <code>.\scripts\setup_ollama.ps1 -Start</code>。</>}
           </span>
-          <button onClick={refreshHealth}>重新检查</button>
+          <button onClick={refreshHealth}>{uiText("重新检查")}</button>
         </div>
       )}
       <div className="ai-layout">
@@ -438,8 +439,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           <div className="ai-history-heading">
             <span>CONVERSATIONS</span>
             <button
-              aria-label="新建对话"
-              title="新建对话"
+              aria-label={uiText("新建对话")}
+              title={uiText("新建对话")}
               disabled={busy}
               onClick={newChat}
             >
@@ -452,7 +453,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             onClick={newChat}
           >
             <Plus size={17} />
-            开始新对话
+            {uiText("开始新对话")}
           </button>
           <div className="ai-conversation-list">
             {conversations.map((c) => (
@@ -475,7 +476,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                 <button
                   disabled={busy}
                   className="ai-delete"
-                  aria-label={`删除对话 ${c.title}`}
+                  aria-label={uiFormat("删除对话 {0}", c.title)}
                   onClick={() => setDeleteId(c.id)}
                 >
                   <Trash2 size={14} />
@@ -486,9 +487,9 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           <div className="ai-private">
             <ShieldCheck size={17} />
             <span>
-              对话记录保存在这台电脑
+              {uiText("对话记录保存在这台电脑")}
               <br />
-              云端模式会发送当前上下文到 DeepSeek
+              {uiText("云端模式会发送当前上下文到 DeepSeek")}
             </span>
           </div>
         </aside>
@@ -496,13 +497,13 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           <div
             className="ai-messages"
             ref={scroll}
-            aria-label="聊天记录"
+            aria-label={uiText("聊天记录")}
             aria-busy={busy}
           >
             {loadingHistory ? (
               <p className="ai-wait">
                 <LoaderCircle className="spin" size={18} />
-                正在读取历史…
+                {uiText("正在读取历史…")}
               </p>
             ) : !messages.length ? (
               <div className="ai-welcome">
@@ -511,20 +512,20 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                 </div>
                 <span>YOUR SPACE TO THINK</span>
                 <h2>
-                  把想法说出来，
+                  {uiText("把想法说出来，")}
                   <br />
-                  一起理清下一步。
+                  {uiText("一起理清下一步。")}
                 </h2>
                 <p>
-                  与 AI 讨论安排、拆解问题。
+                  {uiText("与 AI 讨论安排、拆解问题。")}
                   <br />
-                  你的目标和节奏，始终由你决定。
+                  {uiText("你的目标和节奏，始终由你决定。")}
                 </p>
                 <div className="ai-suggestions">
                   {[
-                    "帮我理清今天安排的优先顺序",
-                    "怎样把一个大目标拆成可执行的小步骤？",
-                    "我有几个安排冲突，帮我一起分析",
+                    uiText("帮我理清今天安排的优先顺序"),
+                    uiText("怎样把一个大目标拆成可执行的小步骤？"),
+                    uiText("我有几个安排冲突，帮我一起分析"),
                   ].map((text) => (
                     <button key={text} onClick={() => setInput(text)}>
                       {text}
@@ -542,11 +543,11 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                     className={`ai-message ai-message-${m.role}`}
                   >
                     <div className="ai-message-avatar">
-                      {m.role === "user" ? "我" : <Cpu size={17} />}
+                      {m.role === "user" ? uiText("我") : <Cpu size={17} />}
                     </div>
                     <div className="ai-message-body">
                       <strong className="ai-message-author">
-                        {m.role === "user" ? "你" : "AI Assistant"}
+                        {m.role === "user" ? uiText("你") : "AI Assistant"}
                       </strong>
                       {m.attachments && m.attachments.length > 0 && (
                         <div className="ai-message-attachments">
@@ -581,26 +582,26 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                       ) : m.status === "generating" ? (
                         <p className="ai-wait">
                           <LoaderCircle size={16} className="spin" />
-                          正在准备回答…
+                          {uiText("正在准备回答…")}
                         </p>
                       ) : (
-                        <p className="ai-muted">没有生成回答</p>
+                        <p className="ai-muted">{uiText("没有生成回答")}</p>
                       )}
                       {m.status === "stopped" && (
                         <small className="ai-message-state">
                           <Square size={11} />
-                          已停止 · 保留部分回答
+                          {uiText("已停止 · 保留部分回答")}
                         </small>
                       )}
                       {m.status === "error" && (
                         <small className="ai-message-error">
-                          {m.error || "回答未完成"}
+                          {m.error || uiText("回答未完成")}
                         </small>
                       )}
                       {m.status === "completed" && m.role === "assistant" && (
                         <small className="ai-message-state">
                           <Check size={12} />
-                          已保存
+                          {uiText("已保存")}
                         </small>
                       )}
                     </div>
@@ -618,15 +619,15 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             )}
             {confirmation && (
               <div className="ai-confirm-action" role="status">
-                <strong>AI 准备执行</strong>
+                <strong>{uiText("AI 准备执行")}</strong>
                 <p>{confirmation.description}</p>
-                <small>预计影响 {confirmation.affected_count} 项</small>
+                <small>{uiText("预计影响")} {confirmation.affected_count} {uiText("项")}</small>
                 <div>
                   <button className="button secondary" onClick={() => void resolveConfirmation(false)}>
-                    取消
+                    {uiText("取消")}
                   </button>
                   <button className="button danger" onClick={() => void resolveConfirmation(true)}>
-                    确认
+                    {uiText("确认")}
                   </button>
                 </div>
               </div>
@@ -638,7 +639,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
               </div>
             )}
             {health?.busy && !busy && (
-              <p className="ai-notice">另一个页面正在生成回答，请等待完成。</p>
+              <p className="ai-notice">{uiText("另一个页面正在生成回答，请等待完成。")}</p>
             )}
             <form
               className="ai-composer"
@@ -658,7 +659,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                       </span>
                       <button
                         type="button"
-                        aria-label={`移除 ${attachment.filename}`}
+                        aria-label={uiFormat("移除 {0}", attachment.filename)}
                         onClick={() => void removeAttachment(attachment)}
                       >
                         <X size={14} />
@@ -668,8 +669,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                 </div>
               )}
               <textarea
-                aria-label="给 AI 的消息"
-                placeholder="说说你的想法，或需要一起理清的安排…"
+                aria-label={uiText("给 AI 的消息")}
+                placeholder={uiText("说说你的想法，或需要一起理清的安排…")}
                 value={input}
                 maxLength={12000}
                 disabled={busy || loadingHistory}
@@ -699,8 +700,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                   <button
                     type="button"
                     className="ai-attach"
-                    title="上传文件"
-                    aria-label="上传文件"
+                    title={uiText("上传文件")}
+                    aria-label={uiText("上传文件")}
                     disabled={busy || loadingHistory || uploading || attachments.length >= 3}
                     onClick={() => fileInput.current?.click()}
                   >
@@ -708,10 +709,10 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                   </button>
                   <span>
                     {uploading
-                      ? "正在读取文件…"
+                      ? uiText("正在读取文件…")
                       : busy
-                        ? "正在生成 · 仅展示最终回答"
-                        : "上传文件 · Enter 发送"}
+                        ? uiText("正在生成 · 仅展示最终回答")
+                        : uiText("上传文件 · Enter 发送")}
                   </span>
                 </div>
                 {busy ? (
@@ -722,13 +723,13 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                     onClick={stop}
                   >
                     <Square size={13} />
-                    {stopping ? "正在停止…" : "停止生成"}
+                    {stopping ? uiText("正在停止…") : uiText("停止生成")}
                   </button>
                 ) : (
                   <button
                     type="submit"
                     className="ai-send"
-                    aria-label="发送消息"
+                    aria-label={uiText("发送消息")}
                     disabled={
                       (!input.trim() && !attachments.length) || loadingHistory || uploading || Boolean(health?.busy)
                     }
@@ -739,9 +740,9 @@ export default function Assistant({ changed }: { changed?: () => void }) {
               </div>
             </form>
             <div className="ai-bottom-note">
-              <span>AI 可通过已授权工具操作任务、日历和重复规则。</span>
+              <span>{uiText("AI 可通过已授权工具操作任务、日历和重复规则。")}</span>
               <button onClick={() => setDebug(!debug)} aria-expanded={debug}>
-                开发者信息
+                {uiText("开发者信息")}
               </button>
             </div>
           </div>
@@ -775,7 +776,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           </div>
           <div>
             <dt>Conversation ID</dt>
-            <dd>{selected || "尚未创建"}</dd>
+            <dd>{selected || uiText("尚未创建")}</dd>
           </div>
         </dl>
       )}
@@ -793,20 +794,20 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           onCancel={() => setDeleteId(null)}
           role="alertdialog"
           aria-modal="true"
-          aria-label="删除对话确认"
+          aria-label={uiText("删除对话确认")}
           className="ai-confirm"
         >
-          <h2>删除这段对话？</h2>
-          <p>会同时删除全部聊天记录，此操作无法撤销。</p>
+          <h2>{uiText("删除这段对话？")}</h2>
+          <p>{uiText("会同时删除全部聊天记录，此操作无法撤销。")}</p>
           <div>
             <button
               className="button secondary"
               onClick={() => setDeleteId(null)}
             >
-              保留对话
+              {uiText("保留对话")}
             </button>
             <button className="button danger" onClick={remove}>
-              确认删除
+              {uiText("确认删除")}
             </button>
           </div>
         </dialog>

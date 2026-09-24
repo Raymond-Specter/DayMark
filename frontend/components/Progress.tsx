@@ -1,3 +1,4 @@
+import { uiText, uiFormat } from "@/lib/i18n";
 import { ArrowUpRight, Flag, FolderOpen, Plus, Target } from "lucide-react";
 import { dateLabel, statusLabel } from "@/lib/api";
 import type {
@@ -96,13 +97,13 @@ export function ProjectPath({
         <span className="muted">
           {project.total
             ? `${project.completed} / ${project.total}`
-            : "暂无任务"}
+            : uiText("暂无任务")}
         </span>
       </div>
       <ProgressBar value={project.percent} color={color} />
       {current && (
         <p className="current-stage">
-          <Flag size={12} /> 当前阶段：{current}
+          <Flag size={12} /> {uiText("当前阶段：")}{current}
         </p>
       )}
       {!compact && project.milestones.length > 0 && (
@@ -121,7 +122,7 @@ export function ProjectPath({
               <div>
                 <strong>{m.name}</strong>
                 <span>
-                  {m.total ? `${m.completed}/${m.total} 已完成` : "暂无任务"}
+                  {m.total ? uiFormat("{0}/{1} 已完成", m.completed, m.total) : uiText("暂无任务")}
                   {m.deadline ? ` · ${dateLabel(m.deadline, true)}` : ""}
                 </span>
               </div>
@@ -150,21 +151,17 @@ export function OverallProgress({
     ...progress.standalone_projects.map((p) => ({
       ...p,
       color: "#acbcf7",
-      goal: "独立项目",
+      goal: uiText("独立项目"),
     })),
   ].filter((p) => p.status !== "archived");
   return (
     <section className="panel overall-panel">
       <div className="panel-heading">
         <div>
-          <span className="eyebrow">THE BIG PICTURE</span>
-          <h2>整体进度与当前阶段</h2>
-          <p className="progress-basis">
-            比例按已生成任务计算；当前阶段按完成记录定位。
-          </p>
+          <h2>{uiText("整体进度与当前阶段")}</h2>
         </div>
         <button className="text-button" onClick={openGoals}>
-          查看全局
+          {uiText("查看全局")}
           <ArrowUpRight size={15} />
         </button>
       </div>
@@ -183,11 +180,11 @@ export function OverallProgress({
         <div className="quiet-empty">
           <Target size={26} />
           <div>
-            <strong>为你的下一步，留一个位置</strong>
-            <p>创建目标、项目和里程碑，进度会随着真实完成记录逐步呈现。</p>
+            <strong>{uiText("为你的下一步，留一个位置")}</strong>
+            <p>{uiText("创建目标、项目和里程碑，进度会随着真实完成记录逐步呈现。")}</p>
           </div>
           <button className="button secondary small" onClick={openGoals}>
-            建立规划
+            {uiText("建立规划")}
             <ArrowUpRight size={15} />
           </button>
         </div>
@@ -210,7 +207,7 @@ export function GoalsPage({
       <div className="section-toolbar">
         <div className="subtle-note">
           <Target size={16} />
-          目标 → 项目 → 里程碑 → 每一次完成
+          {uiText("目标 → 项目 → 里程碑 → 每一次完成")}
         </div>
         <div className="button-group">
           <button
@@ -218,7 +215,7 @@ export function GoalsPage({
             onClick={() => edit({ kind: "project" })}
           >
             <Plus size={15} />
-            项目
+            {uiText("项目")}
           </button>
           <button
             className="button secondary small"
@@ -226,7 +223,7 @@ export function GoalsPage({
             disabled={!data.projects.length}
           >
             <Plus size={15} />
-            里程碑
+            {uiText("里程碑")}
           </button>
         </div>
       </div>
@@ -237,19 +234,18 @@ export function GoalsPage({
             <span />
             <i />
           </div>
-          <p className="eyebrow">A SPACE FOR YOUR AMBITIONS</p>
-          <h2>你的规划，由你定义</h2>
+          <h2>{uiText("你的规划，由你定义")}</h2>
           <p>
-            一个长期目标，一两个项目，一些小的里程碑。
+            {uiText("一个长期目标，一两个项目，一些小的里程碑。")}
             <br />
-            从你在意的事情开始，不需要一次想好所有安排。
+            {uiText("从你在意的事情开始，不需要一次想好所有安排。")}
           </p>
           <button
             className="button primary"
             onClick={() => edit({ kind: "goal" })}
           >
             <Plus size={17} />
-            创建第一个目标
+            {uiText("创建第一个目标")}
           </button>
         </div>
       )}
@@ -278,7 +274,7 @@ export function GoalsPage({
                   })
                 }
               >
-                编辑
+                {uiText("编辑")}
                 <ArrowUpRight size={14} />
               </button>
             </div>
@@ -295,21 +291,21 @@ export function GoalsPage({
               </strong>
               <span>
                 {goal.total
-                  ? `${goal.completed} / ${goal.total} · 已生成任务完成率`
-                  : "尚无任务 · 等待你的第一步"}
+                  ? uiFormat("{0} / {1} · 已生成任务完成率", goal.completed, goal.total)
+                  : uiText("尚无任务 · 等待你的第一步")}
               </span>
             </div>
             <ProgressBar value={goal.percent} color={goal.color} />
             <div className="goal-dates">
               <span>
-                开始{" "}
+                {uiText("开始")}{" "}
                 {data.goals.find((g) => g.id === goal.id)?.start_date ||
-                  "未设置"}
+                  uiText("未设置")}
               </span>
               <span>
-                目标{" "}
+                {uiText("目标")}{" "}
                 {data.goals.find((g) => g.id === goal.id)?.target_date ||
-                  "未设置"}
+                  uiText("未设置")}
               </span>
             </div>
             <div className="goal-projects">
@@ -326,7 +322,7 @@ export function GoalsPage({
                         })
                       }
                     >
-                      编辑项目
+                      {uiText("编辑项目")}
                     </button>
                     <button
                       className="text-button"
@@ -338,7 +334,7 @@ export function GoalsPage({
                       }
                     >
                       <Plus size={12} />
-                      里程碑
+                      {uiText("里程碑")}
                     </button>
                     <button
                       className="text-button"
@@ -350,7 +346,7 @@ export function GoalsPage({
                       }
                     >
                       <Plus size={12} />
-                      任务
+                      {uiText("任务")}
                     </button>
                   </div>
                   {project.milestones.length > 0 && (
@@ -382,7 +378,7 @@ export function GoalsPage({
               }
             >
               <Plus size={15} />
-              添加项目
+              {uiText("添加项目")}
             </button>
           </section>
         ))}
@@ -391,8 +387,7 @@ export function GoalsPage({
         <section className="panel standalone-panel">
           <div className="panel-heading">
             <div>
-              <span className="eyebrow">INDEPENDENT PROJECTS</span>
-              <h2>独立项目</h2>
+              <h2>{uiText("独立项目")}</h2>
             </div>
           </div>
           <div className="standalone-grid">
@@ -409,7 +404,7 @@ export function GoalsPage({
                       })
                     }
                   >
-                    编辑项目
+                    {uiText("编辑项目")}
                   </button>
                   <button
                     className="text-button"
@@ -421,7 +416,7 @@ export function GoalsPage({
                     }
                   >
                     <Plus size={12} />
-                    里程碑
+                    {uiText("里程碑")}
                   </button>
                   <button
                     className="text-button"
@@ -433,7 +428,7 @@ export function GoalsPage({
                     }
                   >
                     <Plus size={12} />
-                    任务
+                    {uiText("任务")}
                   </button>
                 </div>
                 <div className="milestone-edit-list">
