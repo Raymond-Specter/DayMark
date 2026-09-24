@@ -1,20 +1,7 @@
-import { getLanguage, uiText, uiFormat } from "@/lib/i18n";
+import { getLanguage, uiText } from "@/lib/i18n";
 import type { ReactNode } from "react";
-import { ArrowDown, ArrowRight, ArrowUpRight, CalendarDays, Clock3, Plus } from "lucide-react";
+import { ArrowDown, ArrowRight, CalendarDays } from "lucide-react";
 import "./cinematic-today.css";
-
-type NextTask = {
-  title: string;
-  start_time: string | null;
-  estimated_duration: number;
-};
-
-type Stage = {
-  project: string;
-  milestone: string;
-  completed: number;
-  total: number;
-};
 
 type Props = {
   dateLabel: string;
@@ -24,12 +11,8 @@ type Props = {
   plannedHours: string;
   activeProjectCount: number;
   dailyPercent: number;
-  nextTask: NextTask | null;
-  stage: Stage | null;
   onShowTasks: () => void;
   onOpenCalendar: () => void;
-  onCreateTask: () => void;
-  onOpenNextTask: () => void;
 };
 
 export default function CinematicToday({
@@ -40,17 +23,9 @@ export default function CinematicToday({
   plannedHours,
   activeProjectCount,
   dailyPercent,
-  nextTask,
-  stage,
   onShowTasks,
   onOpenCalendar,
-  onCreateTask,
-  onOpenNextTask,
 }: Props) {
-  const stagePercent = stage?.total
-    ? Math.min(100, Math.max(0, Math.round((stage.completed / stage.total) * 100)))
-    : 0;
-
   return (
     <section className="cinematic-today" aria-labelledby="cinematic-today-title">
       <div className="cinematic-today__art" aria-hidden="true">
@@ -106,57 +81,6 @@ export default function CinematicToday({
           </div>
         </div>
 
-        <aside className="cinematic-today__cards" aria-label={uiText("接下来的安排与当前阶段")}>
-          <div className="cinematic-today__card cinematic-today__enter cinematic-today__delay-5">
-            <div className="cinematic-today__card-top">
-              <span>{uiText("下一项")} <span className="cinematic-today__card-index">01</span></span>
-              <Clock3 size={17} aria-hidden="true" />
-            </div>
-            {nextTask ? (
-              <>
-                <span className="cinematic-today__card-time">
-                  {nextTask.start_time || uiText("时间待定")}
-                  {nextTask.estimated_duration > 0 && <span> · {nextTask.estimated_duration} {uiText("分钟")}</span>}
-                </span>
-                <h2 title={nextTask.title}>{nextTask.title}</h2>
-                <button type="button" className="cinematic-today__card-link" onClick={onOpenNextTask}>
-                  {uiText("打开任务")} <ArrowUpRight size={15} aria-hidden="true" />
-                </button>
-              </>
-            ) : (
-              <>
-                <h2>{remainingCount > 0 ? uiText("等待前置任务") : uiText("暂时没有下一项")}</h2>
-                <button type="button" className="cinematic-today__card-link" onClick={onCreateTask}>
-                  <Plus size={15} aria-hidden="true" /> {uiText("添加任务")}
-                </button>
-              </>
-            )}
-          </div>
-
-          <div className="cinematic-today__card cinematic-today__stage cinematic-today__enter cinematic-today__delay-6">
-            <div className="cinematic-today__card-top">
-              <span>{uiText("当前阶段")} <span className="cinematic-today__card-index">02</span></span>
-              <span className="cinematic-today__stage-percent">{stage ? `${stagePercent}%` : "—"}</span>
-            </div>
-            <span className="cinematic-today__stage-project">{stage?.project || uiText("尚无进行中项目")}</span>
-            <h2 title={stage?.milestone || ""}>{stage?.milestone || uiText("阶段待设置")}</h2>
-            {stage && (
-              <div
-                className="cinematic-today__stage-track"
-                role="progressbar"
-                aria-label={uiText("当前项目任务完成率")}
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={stagePercent}
-              >
-                <span style={{ width: `${stagePercent}%` }} />
-              </div>
-            )}
-            <span className="cinematic-today__stage-count">
-              {stage ? uiFormat("{0} / {1} 项任务完成", stage.completed, stage.total) : uiText("添加项目后会显示当前阶段")}
-            </span>
-          </div>
-        </aside>
       </div>
 
       <footer className="cinematic-today__footer cinematic-today__enter cinematic-today__delay-7">

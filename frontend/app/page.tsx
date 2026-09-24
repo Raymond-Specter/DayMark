@@ -357,18 +357,6 @@ export default function Home() {
           (complete.length / (remaining.length + complete.length)) * 100,
         )
       : 0;
-  const featuredProject = activeProjects[0];
-  const featuredStage = featuredProject
-    ? {
-        project: featuredProject.name,
-        milestone:
-          typeof featuredProject.current_milestone === "string"
-            ? featuredProject.current_milestone
-            : featuredProject.current_milestone?.name || uiText("待设置里程碑"),
-        completed: featuredProject.completed,
-        total: featuredProject.total,
-      }
-    : null;
   const plannedMinutes =
     today?.tasks
       .filter((t) => t.status !== "cancelled")
@@ -668,8 +656,6 @@ export default function Home() {
                     plannedHours={String(hours(plannedMinutes))}
                     activeProjectCount={activeProjects.length}
                     dailyPercent={dailyPercent}
-                    nextTask={nextTask ?? null}
-                    stage={featuredStage}
                     onShowTasks={() =>
                       document.getElementById("today-plan")?.scrollIntoView({
                         behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
@@ -678,10 +664,6 @@ export default function Home() {
                       })
                     }
                     onOpenCalendar={() => navigate("calendar")}
-                    onCreateTask={() => setEditor({ kind: "task" })}
-                    onOpenNextTask={() =>
-                      nextTask ? editTask(nextTask) : setEditor({ kind: "task" })
-                    }
                   />
                   <div className="today-after-hero">
                   {activeProjects.length > 0 && <section className="phase-strip">

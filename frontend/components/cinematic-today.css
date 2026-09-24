@@ -110,15 +110,11 @@
 .cinematic-today__date svg { opacity: .75; }
 
 .cinematic-today__body {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(265px, 320px);
-  align-items: end;
-  gap: clamp(24px, 4vw, 68px);
   margin-top: auto;
   padding: clamp(82px, 12vh, 156px) 0 50px;
 }
 
-.cinematic-today__copy { min-width: 0; }
+.cinematic-today__copy { max-width: 980px; }
 
 .cinematic-today__eyebrow {
   display: flex;
@@ -224,84 +220,6 @@
 
 .cinematic-today__secondary:hover { background: #ffffff14; transform: translateY(-2px); }
 
-.cinematic-today__cards {
-  display: grid;
-  gap: 12px;
-  min-width: 0;
-}
-
-.cinematic-today__card {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  min-width: 0;
-  min-height: 160px;
-  padding: 20px 22px;
-  border: 1px solid #ffffff30;
-  border-radius: 13px;
-  background: #16191ed6;
-  color: #fff;
-  -webkit-backdrop-filter: blur(16px);
-  backdrop-filter: blur(16px);
-  box-shadow: inset 0 1px #ffffff16, 0 12px 42px #0004;
-}
-
-.cinematic-today__card-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  color: #d5d8e0;
-  font-size: 10px;
-  font-weight: 650;
-  letter-spacing: .17em;
-}
-
-.cinematic-today__card-top svg { opacity: .75; }
-.cinematic-today__card-index { color: #a9afba; margin-left: 5px; }
-.cinematic-today__card-time,
-.cinematic-today__stage-project {
-  display: block;
-  margin-top: 16px;
-  color: #bfc9d8;
-  font-size: 11px;
-  letter-spacing: .025em;
-  font-variant-numeric: tabular-nums;
-}
-
-.cinematic-today__card .cinematic-today__card-time + h2 { margin-top: 5px; }
-.cinematic-today__card h2 {
-  max-width: 100%;
-  margin: 18px 0 0;
-  color: #f7f8f9;
-  font-size: 18px;
-  font-weight: 560;
-  letter-spacing: -.035em;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.cinematic-today__card-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: auto;
-  padding: 10px 0 0;
-  color: #e9edf6;
-  font-size: 11px;
-  font-weight: 600;
-}
-
-.cinematic-today__card-link:hover { color: #fff; transform: translateX(3px); }
-.cinematic-today__stage { min-height: 164px; }
-.cinematic-today__stage-percent { font-size: 12px; font-variant-numeric: tabular-nums; letter-spacing: 0; }
-.cinematic-today__stage-project { margin-top: 13px; }
-.cinematic-today__stage h2 { margin: 5px 0 13px; font-size: 16px; }
-.cinematic-today__stage-track { width: 100%; height: 3px; border-radius: 99px; background: #ffffff30; overflow: hidden; }
-.cinematic-today__stage-track span { display: block; height: 100%; background: #dce5fa; border-radius: inherit; }
-.cinematic-today__stage-count { margin-top: 8px; color: #bfc3cd; font-size: 10px; font-variant-numeric: tabular-nums; }
-
 .cinematic-today__footer {
   display: flex;
   align-items: end;
@@ -357,10 +275,7 @@
 .cinematic-today__delay-0 { animation-delay: 0ms; }
 .cinematic-today__delay-1 { animation-delay: 160ms; }
 .cinematic-today__delay-2 { animation-delay: 280ms; }
-.cinematic-today__delay-3 { animation-delay: 400ms; }
 .cinematic-today__delay-4 { animation-delay: 520ms; }
-.cinematic-today__delay-5 { animation-delay: 600ms; }
-.cinematic-today__delay-6 { animation-delay: 700ms; }
 .cinematic-today__delay-7 { animation-delay: 780ms; }
 
 @keyframes cinematic-today-blur-fade-up {
@@ -374,16 +289,13 @@
 }
 
 @media (max-width: 1020px) {
-  .cinematic-today__body { grid-template-columns: minmax(0, 1fr) minmax(225px, 275px); gap: 25px; }
   .cinematic-today .cinematic-today__title { font-size: clamp(48px, 5.5vw, 70px); }
 }
 
 @media (max-width: 900px) and (min-width: 701px) {
   .cinematic-today__top { flex-wrap: wrap; }
   .cinematic-today__header-right { width: 100%; justify-content: space-between; }
-  .cinematic-today__body { grid-template-columns: 1fr; gap: 30px; padding-top: 75px; }
-  .cinematic-today__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .cinematic-today__card { min-height: 165px; }
+  .cinematic-today__body { padding-top: 75px; }
   .cinematic-today__metrics { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
   .cinematic-today__metric > span { white-space: normal; }
   .cinematic-today__scroll { display: none; }
@@ -405,24 +317,12 @@
   .cinematic-today__date { font-size: 10px; gap: 5px; }
   .cinematic-today__date svg { width: 13px; height: 13px; }
   .cinematic-today__body {
-    display: flex;
-    flex-direction: column;
-    align-items: stretch;
-    gap: 31px;
     padding: 70px 0 30px;
   }
   .cinematic-today .cinematic-today__title { margin: 16px 0 11px; font-size: clamp(41px, 10vw, 58px); line-height: 1.2; }
   .cinematic-today__eyebrow { font-size: 10px; }
   .cinematic-today__actions { margin-top: 22px; }
   .cinematic-today__primary, .cinematic-today__secondary { min-height: 43px; padding: 0 17px; font-size: 11px; }
-  .cinematic-today__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; }
-  .cinematic-today__card { min-height: 155px; padding: 14px; }
-  .cinematic-today__card-top { font-size: 8px; letter-spacing: .1em; }
-  .cinematic-today__card-index { display: none; }
-  .cinematic-today__card h2 { font-size: 14px; }
-  .cinematic-today__card-time, .cinematic-today__stage-project { margin-top: 11px; font-size: 10px; }
-  .cinematic-today__stage h2 { margin-bottom: 9px; }
-  .cinematic-today__stage-count { line-height: 1.35; }
   .cinematic-today__footer { align-items: stretch; }
   .cinematic-today__metrics { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
   .cinematic-today__metric strong { font-size: 20px; }
@@ -434,9 +334,6 @@
   .cinematic-today { padding-inline: 17px; }
   .cinematic-today .cinematic-today__title { font-size: 39px; }
   .cinematic-today__body { padding-top: 46px; }
-  .cinematic-today__card { padding: 12px; }
-  .cinematic-today__card-top { font-size: 7px; }
-  .cinematic-today__card h2 { font-size: 13px; }
 }
 
 @media (prefers-reduced-motion: reduce) {
