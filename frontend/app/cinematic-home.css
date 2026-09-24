@@ -1,0 +1,41 @@
+/* Today opens with a full-width visual; the planning workspace remains below it. */
+.page-content.page-today {
+  max-width: none;
+  padding: 0;
+  animation: none;
+}
+
+.page-today > .page-heading { display: none; }
+
+.page-today .today-after-hero {
+  max-width: 1480px;
+  margin-inline: auto;
+  padding: 30px 38px 0;
+}
+
+.page-today #today-plan { scroll-margin-top: 92px; }
+
+.page-today > .page-footer {
+  max-width: 1480px;
+  margin-inline: auto;
+  padding: 32px 38px 22px;
+}
+
+.page-today > .loading-panel,
+.page-today > .large-empty {
+  max-width: 1200px;
+  margin: 30px auto;
+}
+
+@media (max-width: 1150px) {
+  .page-today .today-after-hero { padding-inline: 25px; }
+  .page-today > .page-footer { padding-inline: 25px; }
+}
+
+@media (max-width: 700px) {
+  .page-today .today-after-hero { padding: 22px 16px 0; }
+  .page-today > .page-footer { padding-inline: 16px; }
+  .page-today #today-plan { scroll-margin-top: 74px; }
+  .page-today > .loading-panel,
+  .page-today > .large-empty { margin: 24px 16px; }
+}

@@ -14,10 +14,10 @@
 body {
   background: var(--surface);
   color: var(--ink);
-  font-family: "Segoe UI Variable Text", "Noto Sans SC", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  font-family: "Inter Variable", "Noto Sans SC", "Microsoft YaHei UI", "PingFang SC", sans-serif;
 }
 h1, h2, h3 {
-  font-family: "Segoe UI Variable Display", "Noto Sans SC", "Microsoft YaHei UI", "PingFang SC", sans-serif;
+  font-family: "Inter Variable", "Noto Sans SC", "Microsoft YaHei UI", "PingFang SC", sans-serif;
 }
 ::selection { background: #596ba4; color: #fff; }
 button:focus-visible, a:focus-visible, summary:focus-visible { outline-color: #acbcf7; }
@@ -93,19 +93,7 @@ input:focus, select:focus, textarea:focus {
 .status-pill.active, .status-pill.completed { background: #23372f; color: #a1e0bf; }
 .status-pill.paused { background: #3a3226; color: #f0cb86; }
 .status-pill.overdue { background: #442d2b; color: #f3b39f; }
-
-.today-hero {
-  background: radial-gradient(circle at 90% 105%, #34384f 0, transparent 30%),
-    linear-gradient(115deg, #1a1d25 0%, #242936 57%, #191c25 100%);
-  border-color: #3b4050;
-  box-shadow: none;
-}
-.today-hero::after { background: linear-gradient(90deg, #b8c7ff, transparent 72%); }
-.hero-kicker, .hero-stat small, .hero-progress > p { color: #b9c8fa; }
-.hero-live-dot { background: #b6c7ff; box-shadow: 0 0 0 5px #b6c7ff24; }
-.hero-main > p, .hero-bottom, .hero-stat > span { color: #c2c8d5; }
-.hero-progress .progress-ring, .progress-ring { color: #aec0ff; }
-.hero-progress .progress-ring .ring-base { color: #4b5265; }
+.progress-ring { color: #aec0ff; }
 .phase-strip { background: #1c1e23; border-color: var(--line); box-shadow: none; color: #aab3c8; }
 .phase-strip-label strong, .phase-items button span { color: #e9eaf0; }
 .phase-strip-label > span, .phase-items strong, .phase-items small, .phase-empty { color: #abb0bf; }
