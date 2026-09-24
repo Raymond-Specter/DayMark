@@ -154,7 +154,7 @@
   font-size: clamp(52px, 6vw, 88px);
   font-weight: 430;
   line-height: 1.14;
-  letter-spacing: -.07em;
+  letter-spacing: -.035em;
   text-wrap: balance;
   text-shadow: 0 2px 32px #0008;
 }
