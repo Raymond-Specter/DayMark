@@ -180,41 +180,6 @@ svg {
   height: 22px;
   background: #a5b5ff;
 }
-.workspace-switch {
-  display: flex;
-  gap: 11px;
-  align-items: center;
-  border: 1px solid #ffffff13;
-  background: #ffffff04;
-  border-radius: 10px;
-  padding: 13px 9px;
-  margin-bottom: 29px;
-}
-.workspace-avatar {
-  height: 33px;
-  width: 33px;
-  background: #3c4964;
-  border-radius: 9px;
-  color: #e2e8ff;
-  font-weight: 700;
-  display: grid;
-  place-items: center;
-}
-.workspace-switch strong {
-  font-size: 13px;
-  color: #e5eaf5;
-  display: block;
-  font-weight: 500;
-}
-.workspace-switch span {
-  font-size: 11px;
-  color: #8491a9;
-  display: block;
-}
-.workspace-switch > svg {
-  margin-left: auto;
-  color: #77869f;
-}
 .nav-caption {
   font-size: 11px;
   letter-spacing: 1.5px;
@@ -2535,16 +2500,6 @@ svg {
   .brand {
     font-size: 25px;
   }
-  .workspace-switch {
-    padding-inline: 7px;
-    gap: 8px;
-  }
-  .workspace-switch strong {
-    font-size: 11px;
-  }
-  .workspace-switch span {
-    font-size: 10px;
-  }
   .sidebar nav button {
     font-size: 12px;
     padding-inline: 12px;
@@ -3194,8 +3149,6 @@ button:focus-visible, a:focus-visible, summary:focus-visible { outline-color: #4
 .brand-mark span { width: 4px; border-radius: 0; background: #dce7e8; }
 .brand-mark span:nth-child(2) { background: #fff; }
 .brand-mark span:nth-child(3) { background: #789ba7; }
-.workspace-switch { border-radius: 4px; border-color: #ffffff21; background: #ffffff09; }
-.workspace-avatar { border-radius: 2px; background: #dce8ea; color: #122129; }
 .nav-caption { color: #92a1a8; text-transform: uppercase; letter-spacing: .18em; }
 .sidebar nav button, .settings-nav { border-radius: 3px; border-left: 2px solid transparent; }
 .sidebar nav button.active, .settings-nav.active { background: #ffffff16; border-left-color: #c4dce2; color: white; box-shadow: none; }

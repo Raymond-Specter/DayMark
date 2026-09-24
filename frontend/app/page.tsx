@@ -497,13 +497,6 @@ export default function Home() {
             daymark<span className="brand-period">.</span>
           </span>
         </a>
-        <div className="workspace-switch">
-          <div className="workspace-avatar">P</div>
-          <div>
-            <strong>{uiText("个人规划空间")}</strong>
-          </div>
-          <ChevronRight size={15} />
-        </div>
         <span className="nav-caption">{uiText("你的每一天")}</span>
         <nav aria-label={uiText("主要导航")}>
           {pages.slice(0, 3).map((p) => (

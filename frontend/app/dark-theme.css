@@ -41,10 +41,8 @@ input:focus, select:focus, textarea:focus {
 .brand-period { color: #b6c4fa; }
 .brand-mark span, .brand-mark span:nth-child(3) { background: #9eaee4; }
 .brand-mark span:nth-child(2) { background: #e1e7ff; }
-.workspace-switch { border-color: #353841; background: #1d1f25; }
-.workspace-avatar { background: #303748; color: #d5dfff; }
-.workspace-switch strong, .profile strong { color: #eef0f5; }
-.workspace-switch span, .profile span, .nav-caption { color: #9b9eaa; }
+.profile strong { color: #eef0f5; }
+.profile span, .nav-caption { color: #9b9eaa; }
 .sidebar nav button { color: #b3b6c1; }
 .sidebar nav button.active, .settings-nav.active {
   background: #303440;
