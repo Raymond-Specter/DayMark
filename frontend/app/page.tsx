@@ -412,6 +412,83 @@ export default function Home() {
     />
   );
 
+  const utilityActions = (
+    <>
+      <button
+        className="icon-button"
+        title={uiText("刷新数据")}
+        aria-label={uiText("刷新数据")}
+        disabled={loading}
+        onClick={async () => {
+          try {
+            await send("/scheduler/sync", {});
+            await refresh();
+            notify(uiText("数据已同步"));
+          } catch (e) {
+            notify((e as Error).message, true);
+          }
+        }}
+      >
+        <RefreshCw size={17} />
+      </button>
+      <div className="notification-anchor">
+        <button
+          className={`icon-button notification-button ${notificationOpen ? "selected" : ""}`}
+          aria-label={uiFormat("提醒通知{0}", unread ? uiFormat("，{0} 条未读", unread) : "")}
+          onClick={() => setNotificationOpen(!notificationOpen)}
+        >
+          <Bell size={19} />
+          {unread > 0 && <i />}
+        </button>
+        {notificationOpen && (
+          <section className="notification-popover">
+            <div>
+              <h3>{uiText("提醒中心")}</h3>
+              <span>{unread} {uiText("条未读")}</span>
+            </div>
+            {data?.notifications.length ? (
+              data.notifications.slice(0, 30).map((n) => (
+                <button
+                  key={n.id}
+                  className={n.read_at ? "read" : ""}
+                  onClick={async () => {
+                    try {
+                      await send(`/notifications/${n.id}/read`, {});
+                      await refresh();
+                      const task = data.tasks.find(
+                        (t) => t.id === n.task_id,
+                      );
+                      if (task) editTask(task);
+                      setNotificationOpen(false);
+                    } catch (e) {
+                      notify((e as Error).message, true);
+                    }
+                  }}
+                >
+                  <span className="notification-dot" />
+                  <div>
+                    <strong>{n.title}</strong>
+                    <p>{deadlineLabel(n.due_at, data.settings.timezone)}</p>
+                  </div>
+                </button>
+              ))
+            ) : (
+              <div className="notification-empty">
+                <Bell size={25} />
+                <p>
+                  {uiText("还没有提醒")}
+                  <br />
+                  <small>{uiText("可为任务或重复规则设置提醒。")}</small>
+                </p>
+              </div>
+            )}
+          </section>
+        )}
+      </div>
+      <div className="topbar-avatar">M</div>
+    </>
+  );
+
   return (
     <div className="app-shell">
       {mobileNav && (
@@ -495,7 +572,7 @@ export default function Home() {
         </div>
       </aside>
       <main className="main-workspace">
-        <header className="topbar">
+        {(page !== "today" || !data || !today || !stats || Boolean(loadError)) && <header className="topbar">
           <div className="breadcrumb">
             <button
               className="icon-button mobile-menu"
@@ -513,82 +590,9 @@ export default function Home() {
               <CalendarDays size={14} />
               {data?.today ? dateLabel(data.today) : uiText("你的个人规划系统")}
             </span>
-            <button
-              className="icon-button"
-              title={uiText("刷新数据")}
-              aria-label={uiText("刷新数据")}
-              disabled={loading}
-              onClick={async () => {
-                try {
-                  await send("/scheduler/sync", {});
-                  await refresh();
-                  notify(uiText("数据已同步"));
-                } catch (e) {
-                  notify((e as Error).message, true);
-                }
-              }}
-            >
-              <RefreshCw size={17} />
-            </button>
-            <div className="notification-anchor">
-              <button
-                className={`icon-button notification-button ${notificationOpen ? "selected" : ""}`}
-                aria-label={uiFormat("提醒通知{0}", unread ? uiFormat("，{0} 条未读", unread) : "")}
-                onClick={() => setNotificationOpen(!notificationOpen)}
-              >
-                <Bell size={19} />
-                {unread > 0 && <i />}
-              </button>
-              {notificationOpen && (
-                <section className="notification-popover">
-                  <div>
-                    <h3>{uiText("提醒中心")}</h3>
-                    <span>{unread} {uiText("条未读")}</span>
-                  </div>
-                  {data?.notifications.length ? (
-                    data.notifications.slice(0, 30).map((n) => (
-                      <button
-                        key={n.id}
-                        className={n.read_at ? "read" : ""}
-                        onClick={async () => {
-                          try {
-                            await send(`/notifications/${n.id}/read`, {});
-                            await refresh();
-                            const task = data.tasks.find(
-                              (t) => t.id === n.task_id,
-                            );
-                            if (task) editTask(task);
-                            setNotificationOpen(false);
-                          } catch (e) {
-                            notify((e as Error).message, true);
-                          }
-                        }}
-                      >
-                        <span className="notification-dot" />
-                        <div>
-                          <strong>{n.title}</strong>
-                          <p>
-                            {deadlineLabel(n.due_at, data.settings.timezone)}
-                          </p>
-                        </div>
-                      </button>
-                    ))
-                  ) : (
-                    <div className="notification-empty">
-                      <Bell size={25} />
-                      <p>
-                        {uiText("还没有提醒")}
-                        <br />
-                        <small>{uiText("可为任务或重复规则设置提醒。")}</small>
-                      </p>
-                    </div>
-                  )}
-                </section>
-              )}
-            </div>
-            <div className="topbar-avatar">M</div>
+            {utilityActions}
           </div>
-        </header>
+        </header>}
         <div className={`page-content page-${page}`}>
           <div className="page-heading">
             <div>
@@ -653,6 +657,12 @@ export default function Home() {
                 <>
                   <CinematicToday
                     dateLabel={dateLabel(data.today)}
+                    headerActions={<>
+                      <button className="icon-button mobile-menu" aria-label={uiText("打开导航")} onClick={() => setMobileNav(true)}>
+                        <Menu size={22} />
+                      </button>
+                      {utilityActions}
+                    </>}
                     remainingCount={remaining.length}
                     completedCount={complete.length}
                     plannedHours={String(hours(plannedMinutes))}

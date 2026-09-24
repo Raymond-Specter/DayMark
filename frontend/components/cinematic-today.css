@@ -5,7 +5,7 @@
   display: flex;
   flex-direction: column;
   width: 100%;
-  min-height: calc(100svh - 72px);
+  min-height: 100svh;
   padding: clamp(25px, 3vw, 45px) clamp(26px, 4vw, 64px) 27px;
   background: #0b0c10;
   color: #f8f8f8;
@@ -54,7 +54,22 @@
   align-items: center;
   justify-content: space-between;
   gap: 20px;
+  z-index: 5;
 }
+
+.cinematic-today__header-right,
+.cinematic-today__utilities {
+  display: flex;
+  align-items: center;
+}
+
+.cinematic-today__header-right { gap: 22px; }
+.cinematic-today__utilities { gap: 12px; }
+.cinematic-today__utilities .icon-button { color: #e7e8ec; }
+.cinematic-today__utilities .icon-button:hover,
+.cinematic-today__utilities .icon-button.selected { background: #ffffff26; }
+.cinematic-today__utilities .topbar-avatar { background: #ffffff24; color: #fff; }
+.cinematic-today__utilities .notification-popover { right: 0; }
 
 .cinematic-today__edition {
   display: inline-flex;
@@ -364,16 +379,25 @@
 }
 
 @media (max-width: 900px) and (min-width: 701px) {
+  .cinematic-today__top { flex-wrap: wrap; }
+  .cinematic-today__header-right { width: 100%; justify-content: space-between; }
   .cinematic-today__body { grid-template-columns: 1fr; gap: 30px; padding-top: 75px; }
   .cinematic-today__cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .cinematic-today__card { min-height: 165px; }
+  .cinematic-today__metrics { width: 100%; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .cinematic-today__metric > span { white-space: normal; }
+  .cinematic-today__scroll { display: none; }
 }
 
 @media (max-width: 700px) {
   .cinematic-today {
-    min-height: calc(100svh - 62px);
+    min-height: 100svh;
     padding: 24px 22px 26px;
   }
+  .cinematic-today__top { flex-wrap: wrap; }
+  .cinematic-today__header-right { width: 100%; justify-content: space-between; }
+  .cinematic-today__utilities { gap: 4px; }
+  .cinematic-today__utilities .notification-popover { width: min(330px, calc(100vw - 44px)); }
   .cinematic-today__art { background-position: 57% center; filter: brightness(.55) saturate(.72); }
   .cinematic-today__art video { object-position: 57% center; }
   .cinematic-today__edition { font-size: 9px; gap: 8px; }

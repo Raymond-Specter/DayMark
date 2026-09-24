@@ -1,4 +1,5 @@
 import { getLanguage, uiText, uiFormat } from "@/lib/i18n";
+import type { ReactNode } from "react";
 import { ArrowDown, ArrowRight, ArrowUpRight, CalendarDays, Clock3, Plus } from "lucide-react";
 import "./cinematic-today.css";
 
@@ -17,6 +18,7 @@ type Stage = {
 
 type Props = {
   dateLabel: string;
+  headerActions: ReactNode;
   remainingCount: number;
   completedCount: number;
   plannedHours: string;
@@ -32,6 +34,7 @@ type Props = {
 
 export default function CinematicToday({
   dateLabel,
+  headerActions,
   remainingCount,
   completedCount,
   plannedHours,
@@ -62,10 +65,13 @@ export default function CinematicToday({
           <span className="cinematic-today__edition-mark" aria-hidden="true" />
           DAYMARK <span aria-hidden="true">/</span> TODAY
         </span>
-        <span className="cinematic-today__date">
-          <CalendarDays size={15} aria-hidden="true" />
-          {dateLabel}
-        </span>
+        <div className="cinematic-today__header-right">
+          <span className="cinematic-today__date">
+            <CalendarDays size={15} aria-hidden="true" />
+            {dateLabel}
+          </span>
+          <div className="cinematic-today__utilities">{headerActions}</div>
+        </div>
       </header>
 
       <div className="cinematic-today__body">
