@@ -1,5 +1,6 @@
 "use client";
 import { loadLanguage, saveLanguage, uiText, uiFormat, type Language } from "@/lib/i18n";
+import { loadTheme, saveTheme, type Theme } from "@/lib/theme";
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
@@ -153,6 +154,7 @@ const emptyProgress: Progress = {
 export default function Home() {
   const [page, setPage] = useState<Page>("today");
   const [language, setLanguageState] = useState<Language>("en");
+  const [theme, setTheme] = useState<Theme>("dark");
   const [mobileNav, setMobileNav] = useState(false);
   const [data, setData] = useState<Bootstrap | null>(null);
   const [today, setToday] = useState<TodayData | null>(null);
@@ -226,6 +228,7 @@ export default function Home() {
   }, [initialize]);
   useEffect(() => {
     setLanguageState(loadLanguage());
+    setTheme(loadTheme());
   }, []);
   useEffect(() => {
     const hash =
@@ -307,6 +310,11 @@ export default function Home() {
   function changeLanguage(next: Language) {
     saveLanguage(next);
     setLanguageState(next);
+  }
+
+  function changeTheme(next: Theme) {
+    saveTheme(next);
+    setTheme(next);
   }
   async function saved(message: string) {
     await refresh();
@@ -637,6 +645,7 @@ export default function Home() {
               {page === "today" && (
                 <>
                   <CinematicToday
+                    theme={theme}
                     dateLabel={dateLabel(data.today)}
                     headerActions={<>
                       <button className="icon-button mobile-menu" aria-label={uiText("打开导航")} onClick={() => setMobileNav(true)}>
@@ -1167,7 +1176,7 @@ export default function Home() {
                 />
               )}
               {page === "settings" && (
-                <SettingsPage data={data} changed={refresh} notify={notify} language={language} onLanguageChange={changeLanguage} />
+                <SettingsPage data={data} changed={refresh} notify={notify} language={language} onLanguageChange={changeLanguage} theme={theme} onThemeChange={changeTheme} />
               )}
             </>
           )}

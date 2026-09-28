@@ -1,9 +1,11 @@
 import { getLanguage, uiText } from "@/lib/i18n";
 import type { ReactNode } from "react";
+import type { Theme } from "@/lib/theme";
 import { ArrowDown, ArrowRight, CalendarDays } from "lucide-react";
 import "./cinematic-today.css";
 
 type Props = {
+  theme: Theme;
   dateLabel: string;
   headerActions: ReactNode;
   remainingCount: number;
@@ -16,6 +18,7 @@ type Props = {
 };
 
 export default function CinematicToday({
+  theme,
   dateLabel,
   headerActions,
   remainingCount,
@@ -29,10 +32,16 @@ export default function CinematicToday({
   return (
     <section className="cinematic-today" aria-labelledby="cinematic-today-title">
       <div className="cinematic-today__art" aria-hidden="true">
-        <video autoPlay loop muted playsInline preload="metadata" poster="/images/gargantua-poster.jpg">
+        {theme === "dark" && <video autoPlay loop muted playsInline preload="metadata" poster="/images/gargantua-poster.jpg">
           <source src="/video/gargantua-background.mp4" type="video/mp4" />
-        </video>
+        </video>}
       </div>
+      {theme === "pink" && <svg className="cinematic-today__flower" viewBox="0 0 400 400" aria-hidden="true">
+        <g fill="#f3bed0" stroke="#fff9fc" strokeWidth="3">
+          {[0, 60, 120, 180, 240, 300].map((angle) => <ellipse key={angle} cx="200" cy="118" rx="61" ry="95" transform={`rotate(${angle} 200 200)`} />)}
+          <circle cx="200" cy="200" r="48" fill="#fff2c9" />
+        </g>
+      </svg>}
       <div className="cinematic-today__bottom-blur" aria-hidden="true" />
 
       <header className="cinematic-today__top cinematic-today__enter cinematic-today__delay-0">

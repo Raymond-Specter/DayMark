@@ -1,5 +1,6 @@
 "use client";
 import { uiText, uiFormat, type Language } from "@/lib/i18n";
+import type { Theme } from "@/lib/theme";
 import { useEffect, useState } from "react";
 import {
   Activity,
@@ -499,12 +500,16 @@ export function SettingsPage({
   notify,
   language,
   onLanguageChange,
+  theme,
+  onThemeChange,
 }: {
   data: Bootstrap;
   changed: () => Promise<void>;
   notify: (text: string, error?: boolean) => void;
   language: Language;
   onLanguageChange: (next: Language) => void;
+  theme: Theme;
+  onThemeChange: (next: Theme) => void;
 }) {
   const [timezone, setTimezone] = useState(data.settings.timezone);
   const [dayStart, setDayStart] = useState(data.settings.day_start);
@@ -554,6 +559,21 @@ export function SettingsPage({
   }
   return (
     <div className="settings-layout">
+      <section className="panel settings-card appearance-settings">
+        <div className="panel-heading"><h2>{uiText("外观风格")}</h2></div>
+        <div className="theme-options" role="group" aria-label={uiText("外观风格")}>
+          {([
+            { id: "dark", label: uiText("午夜黑"), detail: uiText("黑色 · 电影感") },
+            { id: "pink", label: uiText("樱花粉"), detail: uiText("奶白 · 柔粉") },
+          ] as const).map((option) => (
+            <button key={option.id} type="button" className={`theme-option theme-option-${option.id}`} aria-pressed={theme === option.id} onClick={() => onThemeChange(option.id)}>
+              <span className="theme-preview" aria-hidden="true"><i /><span><b /><b /><b /></span></span>
+              <span className="theme-option-label"><strong>{option.label}</strong><small>{option.detail}</small></span>
+              <span className="theme-option-check" aria-hidden="true">{theme === option.id ? <Check size={16} /> : null}</span>
+            </button>
+          ))}
+        </div>
+      </section>
       <form className="panel settings-card" onSubmit={save}>
         <div className="panel-heading">
           <div>
