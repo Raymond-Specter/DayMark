@@ -254,6 +254,14 @@ class AgentService:
         if ("截止" in text and names == {"get_tasks", "get_calendar", "get_free_slots"}
                 and any(marker in text for marker in ("查看", "哪些", "临近", "未来", "查询"))):
             names = {"get_upcoming_deadlines"}
+        task_tools = {"get_today_tasks", "get_tasks", "get_calendar", "get_free_slots",
+                      "get_upcoming_deadlines", "create_task", "schedule_task", "update_task",
+                      "reschedule_task", "complete_task", "reopen_task", "cancel_task",
+                      "keep_task_overdue", "delete_task", "replan_day", "undo_last_action"}
+        # A task title can contain action words such as 完成. Keep the task
+        # domain available and let the model distinguish scheduling from status changes.
+        if names <= task_tools and self._requires_tool(text):
+            names = task_tools
         return [self.registry.definitions[name].provider_schema() for name in names if name in self.registry.definitions]
 
     @staticmethod

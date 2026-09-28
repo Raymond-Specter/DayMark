@@ -64,6 +64,20 @@ def test_recurring_language_routes_to_create_routine(session_factory):
     assert "save_attachment_to_knowledge" in knowledge_names
 
 
+def test_task_completion_word_does_not_hide_creation_tools(session_factory):
+    registry, tool_executor = executor(session_factory)
+    agent = AgentService(None, registry, tool_executor, session_factory)
+    for request in (
+        "今天14:00–16:00完成一份托福题，在任务和日历中加一下",
+        "安排明天完成作业",
+        "把今天的托福刷题任务标记完成",
+        "今天有哪些未完成任务",
+    ):
+        names = {item["function"]["name"] for item in agent._tool_schemas(request)}
+        assert {"get_tasks", "create_task", "complete_task", "get_calendar"} <= names
+        assert "create_routine" not in names
+
+
 def test_goal_domain_exposes_complete_tools_and_handles_colloquial_create(session_factory):
     registry, tool_executor = executor(session_factory)
     agent = AgentService(None, registry, tool_executor, session_factory)
