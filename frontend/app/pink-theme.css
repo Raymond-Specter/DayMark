@@ -1,5 +1,5 @@
-/* Theme previews remain available in both styles. */
-.theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+/* Theme previews remain available in every style. */
+.theme-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 16px; }
 .theme-option { position: relative; padding: 12px; border: 1px solid var(--line); border-radius: 16px; text-align: left; transition: border-color .2s, box-shadow .2s, transform .2s; }
 .theme-option:hover { transform: translateY(-2px); }
 .theme-option[aria-pressed="true"] { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue-soft); }

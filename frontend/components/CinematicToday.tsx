@@ -42,6 +42,12 @@ export default function CinematicToday({
           <circle cx="200" cy="200" r="48" fill="#fff2c9" />
         </g>
       </svg>}
+      {theme === "morandi" && <svg className="cinematic-today__flower morandi-art" viewBox="0 0 400 400" aria-hidden="true">
+        <rect x="145" y="30" width="170" height="270" rx="85" fill="#a6b3a5" />
+        <circle cx="142" cy="268" r="100" fill="#c4a599" />
+        <ellipse cx="234" cy="331" rx="132" ry="40" fill="#d6ccba" />
+        <path d="M233 79v168" stroke="#f5f2ed" strokeWidth="2" fill="none" />
+      </svg>}
       <div className="cinematic-today__bottom-blur" aria-hidden="true" />
 
       <header className="cinematic-today__top cinematic-today__enter cinematic-today__delay-0">

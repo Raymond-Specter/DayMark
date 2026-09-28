@@ -1,13 +1,14 @@
-export type Theme = "dark" | "pink";
+export type Theme = "dark" | "pink" | "morandi";
 
 const storageKey = "daymark.theme";
 
-export const themeInitScript = `try { document.documentElement.dataset.theme = localStorage.getItem("${storageKey}") === "pink" ? "pink" : "dark"; } catch { document.documentElement.dataset.theme = "dark"; }`;
+export const themeInitScript = `try { document.documentElement.dataset.theme = ["pink", "morandi"].includes(localStorage.getItem("${storageKey}")) ? localStorage.getItem("${storageKey}") : "dark"; } catch { document.documentElement.dataset.theme = "dark"; }`;
 
 export function loadTheme(): Theme {
   let theme: Theme = "dark";
   try {
-    theme = localStorage.getItem(storageKey) === "pink" ? "pink" : "dark";
+    const saved = localStorage.getItem(storageKey);
+    theme = saved === "pink" || saved === "morandi" ? saved : "dark";
   } catch {}
   document.documentElement.dataset.theme = theme;
   return theme;
