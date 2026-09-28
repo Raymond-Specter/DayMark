@@ -566,6 +566,7 @@ export function SettingsPage({
             { id: "dark", label: uiText("午夜黑"), detail: uiText("黑色 · 电影感") },
             { id: "pink", label: uiText("樱花粉"), detail: uiText("奶白 · 柔粉") },
             { id: "morandi", label: uiText("莫兰迪"), detail: uiText("暖灰 · 鼠尾草绿") },
+            { id: "mist", label: uiText("雾蓝柔粉"), detail: uiText("雾蓝 · 柔粉") },
           ] as const).map((option) => (
             <button key={option.id} type="button" className={`theme-option theme-option-${option.id}`} aria-pressed={theme === option.id} onClick={() => onThemeChange(option.id)}>
               <span className="theme-preview" aria-hidden="true"><i /><span><b /><b /><b /></span></span>

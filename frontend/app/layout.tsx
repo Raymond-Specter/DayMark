@@ -5,6 +5,7 @@ import "./dark-theme.css";
 import "./cinematic-home.css";
 import "./pink-theme.css";
 import "./morandi-theme.css";
+import "./mist-theme.css";
 import { themeInitScript } from "@/lib/theme";
 export const metadata: Metadata = {
   title: "Daymark · Personal Planning System",

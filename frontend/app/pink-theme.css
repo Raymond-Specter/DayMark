@@ -1,5 +1,5 @@
 /* Theme previews remain available in every style. */
-.theme-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr)); gap: 16px; }
+.theme-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
 .theme-option { position: relative; padding: 12px; border: 1px solid var(--line); border-radius: 16px; text-align: left; transition: border-color .2s, box-shadow .2s, transform .2s; }
 .theme-option:hover { transform: translateY(-2px); }
 .theme-option[aria-pressed="true"] { border-color: var(--blue); box-shadow: 0 0 0 2px var(--blue-soft); }
@@ -159,7 +159,7 @@ html[data-theme="pink"] .ai-key-panel small.configured { color: #287859; }
 html[data-theme="pink"] .ai-settings-drawer input[type="range"] { accent-color: #b23b70; }
 
 @media (max-width: 700px) {
-  .theme-options { gap: 12px; }
+  .theme-options { grid-template-columns: 1fr; gap: 12px; }
   .theme-preview { height: 76px; }
   .theme-option { padding: 9px; }
   .cinematic-today__flower { right: -50px; top: 26%; opacity: .35; }
