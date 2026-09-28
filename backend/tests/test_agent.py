@@ -1,5 +1,7 @@
 import asyncio
 
+import pytest
+
 from sqlalchemy import select
 
 from app.agent.agent_service import AgentService, MANUAL
@@ -42,65 +44,40 @@ def test_agent_manual_is_loaded_and_documents_every_tool(session_factory):
     assert "Task 的预计用时等于结束时间减开始时间" in prompt
 
 
-def test_recurring_language_routes_to_create_routine(session_factory):
-    registry, tool_executor = executor(session_factory)
-    agent = AgentService(None, registry, tool_executor, session_factory)
-    names = {item["function"]["name"] for item in agent._tool_schemas(
-        "从明天到 10 月 1 日，每天 07:00 到 08:00 晨读")}
-    assert "create_routine" in names and "create_task" not in names
-    milestone_names = {item["function"]["name"] for item in agent._tool_schemas("修改里程碑截止日期")}
-    assert {"get_projects", "get_milestones", "create_milestone",
-            "update_milestone", "delete_milestone"} == milestone_names
-    hierarchy_names = {item["function"]["name"] for item in agent._tool_schemas(
-        "新建目标毕业设计，并在下面创建项目原型开发")}
-    assert {"create_goal", "get_goals", "create_project"} <= hierarchy_names
-    learning_names = {item["function"]["name"] for item in agent._tool_schemas(
-        "记录今天学习 Attention 90 分钟，进度 80%")}
-    assert "create_learning_entry" in learning_names and "create_task" not in learning_names
-    event_names = {item["function"]["name"] for item in agent._tool_schemas("明天 10 点有个项目会议")}
-    assert "create_event" in event_names
-    knowledge_names = {item["function"]["name"] for item in agent._tool_schemas(
-        "把刚上传的课件.pdf 保存到知识库")}
-    assert "save_attachment_to_knowledge" in knowledge_names
-
-
-def test_task_completion_word_does_not_hide_creation_tools(session_factory):
-    registry, tool_executor = executor(session_factory)
-    agent = AgentService(None, registry, tool_executor, session_factory)
-    for request in (
-        "今天14:00–16:00完成一份托福题，在任务和日历中加一下",
-        "安排明天完成作业",
-        "把今天的托福刷题任务标记完成",
-        "今天有哪些未完成任务",
-    ):
-        names = {item["function"]["name"] for item in agent._tool_schemas(request)}
-        assert {"get_tasks", "create_task", "complete_task", "get_calendar"} <= names
-        assert "create_routine" not in names
-
-
-def test_goal_domain_exposes_complete_tools_and_handles_colloquial_create(session_factory):
-    registry, tool_executor = executor(session_factory)
-    agent = AgentService(None, registry, tool_executor, session_factory)
-    names = {item["function"]["name"] for item in agent._tool_schemas(
-        "我要哦订一个目标就是10月2日考托福")}
-    assert {"get_goals", "create_goal", "update_goal", "delete_goal"} <= names
-
-
-def test_short_confirmation_inherits_recent_tool_intent(session_factory):
-    registry, tool_executor = executor(session_factory)
-    agent = AgentService(None, registry, tool_executor, session_factory)
-    messages = [
-        Message("system", "system"),
-        Message("user", "我要哦订一个目标就是10月2日考托福"),
-        Message("assistant", "请确认"),
-        Message("user", "都行"),
-        Message("assistant", "请再次确认"),
-        Message("user", "确认"),
-    ]
-    routing_text = agent._routing_text(messages)
-    assert "10月2日考托福" in routing_text
-    names = {item["function"]["name"] for item in agent._tool_schemas(routing_text)}
-    assert "create_goal" in names
+@pytest.mark.parametrize("wording", [
+    "帮我建吧", "就按刚才那个办", "put that on my calendar", "安排一下",
+])
+def test_all_tools_and_recent_context_are_available_for_any_wording(session_factory, wording):
+    async def run():
+        with session_factory() as db:
+            conversation = Conversation(); db.add(conversation); db.commit()
+        previous_request = "2026-10-01 14:00–16:00 看审稿人意见并找到合适的二区"
+        previous_reply = "本轮没有 create_task，无法创建。"
+        provider = ScriptedProvider([
+            ChatChunk(tool_calls=[{"id": "create", "function": {"name": "create_task", "arguments": {
+                "title": "看审稿人意见并找到合适的二区", "date": "2026-10-01",
+                "start_time": "14:00", "end_time": "16:00", "duration_minutes": 120,
+            }}}], done=True),
+            ChatChunk(content="已创建，14:00–16:00。", done=True),
+        ])
+        registry, tool_executor = executor(session_factory)
+        agent = AgentService(LLMService(provider), registry, tool_executor, session_factory)
+        outcome = await agent.run(conversation.id, [
+            Message("system", "test"), Message("user", previous_request),
+            Message("assistant", previous_reply), Message("user", wording),
+        ], GenerationOptions(), lambda event: asyncio.sleep(0))
+        assert outcome.affected_entities
+        for messages, tools in provider.requests:
+            assert {tool["function"]["name"] for tool in tools} == set(registry.definitions)
+            assert any(message.content == previous_request for message in messages)
+            assert any(message.content == previous_reply for message in messages)
+            assert "create_task" in messages[0].content
+        with session_factory() as db:
+            task = db.scalar(select(Task).where(Task.title == "看审稿人意见并找到合适的二区"))
+            assert task and task.status == "pending"
+            assert (task.start_time, task.end_time, task.estimated_duration) == ("14:00", "16:00", 120)
+            assert db.scalar(select(CalendarEvent).where(CalendarEvent.task_id == task.id))
+    asyncio.run(run())
 
 
 def test_workspace_tools_cover_manual_page_operations(session_factory):
@@ -323,11 +300,8 @@ def test_routine_tools_create_update_and_pause(session_factory):
         assert routine and routine.active is False and routine.preferred_time == "08:30"
 
 
-def test_add_to_calendar_phrase_exposes_create_task_and_normalizes_midnight(session_factory):
+def test_task_creation_normalizes_midnight(session_factory):
     registry, tools = executor(session_factory)
-    agent = AgentService(None, registry, tools, session_factory)
-    schemas = agent._tool_schemas("今天晚上24点学习，把它加到任务和日历中")
-    assert "create_task" in {item["function"]["name"] for item in schemas}
     with session_factory() as db:
         conversation = Conversation(); db.add(conversation); db.commit(); key = conversation.id
     result = tools.execute(key, "create_task", {
@@ -378,14 +352,12 @@ def test_late_task_without_duration_is_created_before_midnight(session_factory):
     asyncio.run(run())
 
 
-def test_timetable_routes_to_batch_import_and_allows_date_clarification(session_factory):
+def test_timetable_allows_date_clarification_without_writing(session_factory):
     async def run():
         registry, tool_executor = executor(session_factory)
         agent = AgentService(LLMService(ScriptedProvider([
             ChatChunk(content="课表里没有学期日期，请提供开始和结束日期？", done=True),
         ])), registry, tool_executor, session_factory)
-        schemas = agent._tool_schemas("把[附件：schedule.pdf]里的课表导入日历")
-        assert {item["function"]["name"] for item in schemas} == {"import_timetable"}
         with session_factory() as db:
             conversation = Conversation(); db.add(conversation); db.commit()
         outcome = await agent.run(
@@ -393,6 +365,9 @@ def test_timetable_routes_to_batch_import_and_allows_date_clarification(session_
             [Message("system", "test"), Message("user", "把附件课表导入日历")],
             GenerationOptions(), lambda event: asyncio.sleep(0))
         assert "请提供开始和结束日期" in outcome.content
+        assert not outcome.affected_entities
+        with session_factory() as db:
+            assert not list(db.scalars(select(Routine)))
     asyncio.run(run())
 
 
