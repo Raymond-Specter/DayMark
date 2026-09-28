@@ -1,132 +1,186 @@
-# DayMark — Personal Planning System
+<div align="center">
 
-一个在自己电脑上运行的个人规划系统。打开后先看今日行动和未完成事项，再查看 Goal → Project → Milestone 的整体进度。所有目标、项目和重复规则均由你创建，初始数据库为空，不预设课程、考试或求职安排，也不会用 AI 改动你的优先级。
+# DayMark
 
-## 启动
+### Plan your day. Keep your progress.
 
-需要 Windows、PowerShell、Python 3.10+ 和 Node.js 22+。在项目目录运行：
+一个将时间规划、日历、学习记录与 AI 操作连接起来的个人工作空间。
+
+![Next.js](https://img.shields.io/badge/Next.js-16-111111?style=flat-square&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-111111?style=flat-square&logo=react&logoColor=61DAFB)
+![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.10%2B-111111?style=flat-square&logo=fastapi&logoColor=009688)
+![SQLite](https://img.shields.io/badge/SQLite-Local_storage-111111?style=flat-square&logo=sqlite&logoColor=8AB4F8)
+
+[功能](#功能) · [快速开始](#快速开始) · [AI Assistant](#ai-assistant) · [开发](#开发)
+
+<img src="frontend/public/images/gargantua-poster.jpg" alt="DayMark 首页使用的 Gargantua 黑洞背景" width="100%" />
+
+</div>
+
+## 关于 DayMark
+
+DayMark 是一个本地优先的个人规划与学习记录应用。打开首页，看到今天要做的事；切换到日历，安排时间；在目标与项目中查看整体进度，再把实际投入和学习资料留在同一个工作空间里。
+
+它提供规划的框架，具体内容由你决定。没有预置课程、考试或求职路线，也不会替你改动优先级。
+
+## 功能
+
+| 模块 | 可以做什么 |
+| --- | --- |
+| **Today** | 查看今日任务、完成进度、计划时长、昨日未完成事项和临近截止任务 |
+| **Calendar** | 日 / 周 / 月视图，拖动任务调整日期和时间，管理独立日历事项 |
+| **Goals & Projects** | 用 Goal → Project → Milestone → Task 组织规划，查看真实完成进度 |
+| **Tasks & Routines** | 创建、编辑、完成、延期和取消任务；支持重复规则及简单依赖 |
+| **AI Assistant** | 用自然语言操作规划数据，支持 DeepSeek Cloud 和本地 Qwen |
+| **Learning Archive** | 记录学习、阅读、作业和研究的实际投入、进展、反思与下一步 |
+| **Knowledge Base** | 保存资料，按日期、项目和类型归档；聊天附件可通过 Agent 保存到知识库 |
+| **Daily Review & Insights** | 记录每日精力与实际投入，查看完成率、时间分布和计划 / 实际对比 |
+
+界面采用深色布局、视频首页与简洁的时间网格。默认英文，可在设置中切换中文；语言切换不会翻译你自己输入的内容。
+
+## 快速开始
+
+当前启动脚本适用于 **Windows + PowerShell**，需要 **Python 3.10+** 和 **Node.js 22+**。
 
 ```powershell
+git clone https://github.com/Raymond-Specter/DayMark.git
+cd DayMark
+
+# 首次安装：依赖、数据库迁移和前端构建
 powershell -ExecutionPolicy Bypass -File .\setup.ps1
+
+# 启动服务并打开网页
 powershell -ExecutionPolicy Bypass -File .\start.ps1
 ```
 
-首次安装会下载依赖、迁移 SQLite 数据库并构建前端。后续只需 `start.ps1`；修改代码或更新依赖后重新执行 `setup.ps1`。启动脚本会在后台运行服务，并打开 [本地应用](http://127.0.0.1:3000)。关闭终端不会关闭应用。电脑关机、重启后需要重新启动。
+打开 **[http://127.0.0.1:3000](http://127.0.0.1:3000)** 即可使用。AI 是可选功能，不配置模型也可以手动管理规划。
 
-安装优先使用 `backend/requirements-lock.txt`（若存在），从 PyPI 安装 Python 依赖，并结合 Windows ROOT / CA 证书库验证 TLS。若当前终端继承了失效代理、网络本身可以直连，可运行 `powershell -ExecutionPolicy Bypass -File .\setup.ps1 -DirectNetwork`；该选项仅在本次安装期间设置 `NO_PROXY=*`，退出时恢复，不修改系统代理或关闭证书验证。
-
-```powershell
-# 启动服务但不打开浏览器
-.\start.ps1 -NoBrowser
-
-# 停止由启动脚本记录的服务，保留全部数据
-.\stop.ps1
-
-# 应用运行时也可备份；使用 SQLite 在线备份并检查完整性
-.\backup.ps1
-```
-
-数据库位于 `data/planner.db`，备份位于 `data/backups/`，服务日志位于 `logs/`，进程记录位于 `.runtime/`。请定期将备份另存至其他磁盘。不要在程序运行时只复制 `.db` 文件：SQLite 的 WAL 可能尚未写回主文件。恢复备份前先停止服务、保留当前数据，再恢复数据库；不要把旧备份与现有 `-wal` / `-shm` 文件混用。
-
-## 使用顺序
-
-1. 在目标与项目页面创建自己的 Goal、Project 和 Milestone；任务也可暂不归属项目。
-2. 添加 Task，填写计划日期、时间、预计时长、优先级及可选提醒。
-3. 创建 Routine，为重复任务选择日期规则。需要前序工作时，选择依赖任务或依赖 Routine 与偏移天数。
-4. 在 Today 查看时间顺序、今日完成情况、临近截止事项及昨日遗留；在日历中拖动任务调整日期与时间。
-5. 完成任务后勾选完成；在每日回顾中记录实际分钟数、精力和笔记。实际时间不会由预计时长自动推断。
-6. 在进度与统计中查看目标、项目、里程碑和任务完成比例，以及计划与实际投入。
-7. 在学习档案中记录实际投入、进展、反思和下一步；这类事实记录独立于计划任务。
-8. 在知识库中上传笔记、课件、代码、PDF 或 DOCX，按知识日期、Project 和文档类型归档。文件和解析文本只保存在本机，不会自动发送给 AI。
-
-任务优先级 `1 / 2 / 3` 分别表示高 / 中 / 低。周视图和本周统计以周一开始。未完成事项不会被自动删除或自动安排到今天；延期、取消、保持逾期均由你决定。
-
-重复任务默认提前生成 30 天，停机后按已保存的生成进度补齐。日历可查看远期日期；编辑规则不会重新解释历史日期。暂停后恢复会跳过暂停期间未生成的日期，过去已取消的实例保持取消。任务日程与独立事件都按设置时区显示，单次任务需在同一天内完成。
-
-## 提醒与当前边界
-
-提醒支持准时、提前 10 / 30 / 60 / 1440 分钟。后端保存提醒计划与通知，页面打开时检查并显示；浏览器系统通知还依赖权限、浏览器及操作系统设置。**关闭网页、电脑睡眠或服务停止时，不能保证系统级实时提醒。** 通知记录仍可在下次打开后查阅。
-
-提供一次性提醒派发命令，可由 Windows 任务计划程序按分钟调用；这只生成站内通知记录，不等于独立的 Windows 推送：
+后续只需运行 `start.ps1`。关闭浏览器或终端不会停止服务；电脑关机或重启后，需要再次启动。
 
 ```powershell
-# 在项目根目录运行一次
-Push-Location .\backend
-..\.venv\Scripts\python.exe -m app.reminder_cli
-Pop-Location
+.\start.ps1 -NoBrowser   # 后台启动，不打开浏览器
+.\stop.ps1              # 停止服务，保留数据
+.\backup.ps1            # 备份数据库
 ```
-
-任务计划程序的“程序”填写项目内 `.venv\Scripts\python.exe` 的绝对路径，“参数”填写 `-m app.reminder_cli`，“起始于”填写 `backend` 的绝对路径。应用没有永久运行的 Python 提醒循环。Google Calendar 尚未接入；本地 AI 的使用方式见下节，无需外部账户。
 
 ## AI Assistant
 
-默认 `Auto` 模式优先使用 DeepSeek Cloud 的 `deepseek-flash`，云端出现可恢复错误且尚未成功写入时安全降级到项目内 `qwen3:8b`。也可以固定选择 `DeepSeek` 或 `Local Qwen`。Agent、工具、业务 Service 和 SQLite 数据始终只有一套。
+AI 不只用于聊天，也可以通过工具创建和修改任务、重复规则、目标、项目、学习记录等内容。每轮提供全部已注册工具，由模型结合近期对话选择操作，无需使用固定句式。
 
-可以在 AI Assistant 的“模型设置”中直接粘贴 DeepSeek API Key；后端会把它写入项目根目录 `.env` 并立即启用。也可以手动设置 `DEEPSEEK_API_KEY` 后重启。Key 不会被接口回显，也不会保存进数据库、聊天记录或 Git。完整变量见 `.env.example`。
+```text
+明天 15:00–16:30 学习 Transformer，加入任务和日历。
+
+从明天起，每周一到周五 07:00–08:00 阅读，持续到 10 月 31 日。
+
+把刚上传的 lecture.pdf 保存到知识库。
+```
+
+Task 创建后会进入日历。已有记录的操作使用真实 ID，写入经过参数验证和业务服务；时间冲突会返回错误，删除、课表导入及大范围改期需要确认。只有工具执行成功后，Agent 才应报告操作完成。
+
+### DeepSeek Cloud
+
+在 **AI Assistant → 模型设置** 中填写并保存自己的 DeepSeek API Key，选择 `DeepSeek` 或 `Auto` 模式即可。也可以在根目录 `.env` 设置 `DEEPSEEK_API_KEY` 后重启；变量说明见 [.env.example](.env.example)。
+
+API Key 保存在本机 `.env`，不会被接口回显，也不会写进聊天记录或 Git。使用云端模型时，对话及其附件文本会发送给所选模型服务；未参与对话的知识库资料不会自动上传。
+
+### Local Qwen
+
+本地模式使用项目目录内的 Ollama 和 `qwen3:8b`，首次安装需要下载数 GB 的模型文件。
 
 ```powershell
-# 首次显式安装项目内的 Ollama、启动服务并下载模型（需要数 GB 下载）
+# 首次安装并下载模型
 powershell -ExecutionPolicy Bypass -File .\scripts\setup_ollama.ps1 -Install -Start -Pull
 
-# 此后统一启动 Ollama + 已构建的项目
+# 后续启动本地模型与应用
 powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
-
-# 仅检查（不会偷偷安装或下载）
-.\scripts\setup_ollama.ps1
-
-# 停止项目和项目管理的 Ollama，保留全部数据
-.\stop.ps1 -IncludeAI
 ```
 
-打开 [AI Assistant](http://127.0.0.1:3000/assistant)，可以用自然语言查询或操作 Task、Calendar、Routine、Goal、Project、Milestone、学习档案、知识库、每日复盘、统计、设置和通知。Agent 通过受控工具调用现有业务 Service，成功后页面自动刷新；明确时间会检查冲突，删除、课表导入和大批量改期需要确认，最近的任务操作可以撤销。模型不能直接执行 SQL，Thinking 开启时仍不展示内部推理。
+`Auto` 优先使用 DeepSeek；发生可恢复错误、且本轮尚未成功写入时，才会降级到本地 Qwen。完整工具集会增加上下文开销，小型本地模型的理解和执行可靠性仍受模型能力、上下文长度与硬件影响。
 
-应用内 Agent 会在每次对话中读取 [功能与使用手册](backend/app/prompts/agent_manual.md)。新增或修改页面功能、Agent Tool、工作流程或能力边界时，必须在同一提交中同步更新该手册。
+### PDF、OCR 与课表
 
-聊天输入框支持上传最多 3 个、每个不超过 10 MB 的文本、Markdown、CSV、JSON、常见代码文件、DOCX 或 PDF。附件和提取文本只保存在本机，并会随对话一起删除。PDF 优先读取标准文字层；对于使用 `UniGB-UCS2-H` 编码、常规工具无法正确映射字体的中文课表，系统会直接解码内嵌文字并按星期列合并跨页内容。真正的扫描版 PDF 才会以 300 DPI 在本机转换为图片，再用 Tesseract 的高精度中英文模型进行 OCR。OCR 检测到星期表头时也会按文字坐标重建星期列，减少课表内容相互串列。首次启用或更换电脑时运行 `.\scripts\setup_ocr.ps1 -DirectNetwork` 准备项目内的 OCR 模型；电脑还需安装 Tesseract OCR 和提供 `pdftoppm`（MiKTeX/Poppler）。
+聊天支持文本、Markdown、CSV、JSON、常见代码文件、DOCX 和 PDF；每次最多上传 **3 个文件**，单个文件不超过 **10 MB**。
 
-上传包含学期起止日期、课程名称、星期和上下课时间的课表后，可以要求 AI“按照附件课表导入日历”。系统会先展示批量导入预览并等待确认，确认后将每门课保存为每周重复任务；课表缺少学期起止日期时会先询问，不会自行猜测。
+PDF 优先提取文字层，扫描版 PDF 使用本地 OCR。课表解析会结合文字坐标整理星期列；识别结果仍需核对。提供学期起止日期和明确上下课时间后，可以让 Agent 批量导入课表，确认预览后生成每周重复规则。
 
-安装位置：`runtime/ollama/`；模型：`models/ollama/`；模型临时文件与身份文件：`.runtime/ollama-*`；日志：`logs/ollama.*.log`。以上均不会进入 Git。环境变量默认值可参考 `.env.example`，如需修改复制为根目录 `.env`，不要提交真实 `.env`。页面保存的模型设置优先于环境默认值，API 地址和超时修改后重启后端生效。
+<details>
+<summary>配置扫描 PDF 的 OCR</summary>
 
-`setup_ollama.ps1 -Install -Start -Pull -DirectNetwork` 可在代理失效而网络可直连时使用；只影响本次进程与它启动的 Ollama。已运行的 Ollama 仍使用启动时的网络设置。安装包校验 SHA256 后才解压。下载模型失败可以重跑以续传。
-
-独立启动模型可运行 `.\scripts\setup_ollama.ps1 -Start`；后端和前端仍由 `.\start.ps1` 启动。独立调试命令、接口和验收说明见 [AI 使用说明](docs/ai_usage.md) 与 [AI 架构](docs/ai_architecture.md)。
-
-这是供单人本机使用的 MVP，服务仅监听 `127.0.0.1`，没有登录或多用户隔离。若日后放到公网或局域网，必须先补充认证、权限、HTTPS 和部署配置。
-
-## 开发与检查
+电脑需安装 Tesseract，并提供 `pdftoppm`（MiKTeX / Poppler）。运行以下命令准备项目内 OCR 模型：
 
 ```powershell
-# 后端测试
-.\.venv\Scripts\python.exe -m pytest backend\tests -q
-
-# 数据迁移
-.\.venv\Scripts\python.exe -m alembic -c backend\alembic.ini upgrade head
-
-# 前端开发模式；先启动后端，避免与生产前端同时占用 3000
-Set-Location frontend
-npm.cmd run dev
+.\scripts\setup_ocr.ps1 -DirectNetwork
 ```
 
-后端 API 运行在 [127.0.0.1:8000](http://127.0.0.1:8000)，可访问 [交互 API 文档](http://127.0.0.1:8000/docs) 和 [健康检查](http://127.0.0.1:8000/health)。前端通过同源 `/api` 代理访问后端。修改后端地址时设置 `BACKEND_URL` 并重新构建前端；默认无需环境配置。
+仅有“第 1–2 节”而没有具体钟点的课表，需要补充学校节次时间表。缺少学期日期或识别不清时，Agent 会询问，不会自行猜测。
 
-遇到端口占用时，启动脚本不会停止未知进程；先检查日志和已有服务。不要同时运行多个写入同一数据库的开发 / 生产后端。
+</details>
 
-升级应用前先备份，再停止服务、执行安装与启动。启动脚本会在启动后端之前应用迁移；已经运行且健康的后端会保留，不会自动重启。
+## 数据与运行说明
 
-## 设计文档
+规划记录保存在 SQLite，上传资料保存在本机项目的数据目录。Git 不包含你的数据库、附件、API Key 或本地模型。
 
-- [需求与验收范围](docs/requirements.md)
-- [架构与服务边界](docs/architecture.md)
-- [数据库结构](docs/database_schema.md)
-- [页面与可视化设计](docs/pages.md)
-- [API 设计](docs/api.md)
-- [项目目录](docs/project_structure.md)
-- [验收记录](docs/verification.md)
-- [本地 AI 架构](docs/ai_architecture.md)
-- [本地 AI 使用与开发说明](docs/ai_usage.md)
-- [本地 AI 文件变更清单](docs/ai_changes.md)
-- [本地 AI 验收记录](docs/ai_verification.md)
-- [学习档案与知识库设计](docs/learning_knowledge_design.md)
+| 路径 | 内容 |
+| --- | --- |
+| `data/planner.db` | 规划数据库 |
+| `data/backups/` | 数据库备份 |
+| `logs/` | 服务日志 |
+| `runtime/ollama/` | 项目内 Ollama |
+| `models/ollama/` | 本地模型 |
 
-实现采用 Next.js、React、FullCalendar、FastAPI、SQLAlchemy、Alembic 和 SQLite。设计参考：[Next.js 官方安装文档](https://nextjs.org/docs/app/getting-started/installation)、[FullCalendar React 接入](https://fullcalendar.io/docs/v6/react)、[拖动与缩放](https://fullcalendar.io/docs/v6/event-dragging-resizing)、[FastAPI 生命周期](https://fastapi.tiangolo.com/advanced/events/)、[SQLAlchemy 2.0](https://docs.sqlalchemy.org/en/20/)。
+<details>
+<summary>备份、更新与常见问题</summary>
+
+- **网页打不开 / Failed to fetch**：先运行 `start.ps1`，确认前后端服务已启动，再查看 `logs/`。端口被未知进程占用时，启动脚本不会替你停止该进程。
+- **修改代码后仍显示旧界面**：生产服务不会自动加载源码修改。先停止服务，重新运行 `setup.ps1` 完成构建，再启动。
+- **更新应用**：先运行 `backup.ps1`，停止服务，更新代码，再执行 `setup.ps1` 和 `start.ps1`。
+- **数据库备份**：使用 `backup.ps1` 的 SQLite 在线备份，不要在运行时只复制 `.db` 文件；WAL 中可能还有未写回的数据。恢复前停止服务并保留当前数据，旧备份不能混用现有 `-wal` / `-shm` 文件。
+- **文件备份**：数据库备份不等于附件备份，上传的文件也需要另行保存。定期把备份复制到其他磁盘。
+- **安装时代理失效**：网络可以直连时，可运行 `setup.ps1 -DirectNetwork`；只调整本次安装的代理设置，保留 TLS 验证。
+
+</details>
+
+## 当前范围
+
+- 目前是**单人本机应用**，只监听 `127.0.0.1`，尚未提供账号登录、多用户隔离或公网部署配置。
+- 提醒支持准时及提前 10 / 30 / 60 / 1440 分钟。网页关闭、电脑睡眠或服务停止时，不能保证系统级实时通知；站内通知记录可在下次打开时查看。
+- Google Calendar 尚未接入。
+- 未完成任务不会自动删除或改期。重复任务默认提前生成 30 天，支持简单依赖；单次任务在同一天内安排。
+- AI 不会自主制定长期路线；模糊指代、缺失信息和 OCR 错误仍可能需要你补充或确认。
+
+## 技术栈
+
+| 层 | 技术 |
+| --- | --- |
+| 前端 | Next.js · React · TypeScript · FullCalendar |
+| 后端 | FastAPI · Pydantic · SQLAlchemy |
+| 数据 | SQLite · Alembic |
+| AI | DeepSeek API · Ollama / Qwen3 · 工具调用 |
+| 文档解析 | PDF 文字提取 · Tesseract OCR |
+
+## 开发
+
+```powershell
+# 后端测试与迁移检查（在项目根目录）
+.\.venv\Scripts\python.exe -m pytest backend\tests -q
+.\.venv\Scripts\python.exe -m alembic -c backend\alembic.ini check
+
+# 前端检查与构建
+cd frontend
+npm.cmd run typecheck
+npm.cmd run build
+```
+
+后端接口文档：[http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)。前端通过同源 `/api` 代理访问后端。
+
+前端开发模式使用 `npm.cmd run dev`，需先启动后端并停止占用 3000 端口的生产前端。更多模型配置见 [AI 使用说明](docs/ai_usage.md)。
+
+应用内 Agent 的能力说明维护在 [agent_manual.md](backend/app/prompts/agent_manual.md)。修改用户功能、工具或工作流程时，请同步更新手册。
+
+---
+
+<div align="center">
+
+**DayMark** · Every step leaves a trace.
+
+</div>
