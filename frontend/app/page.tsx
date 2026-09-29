@@ -51,6 +51,7 @@ import {
   OverallProgress,
 } from "@/components/Progress";
 import CinematicToday from "@/components/CinematicToday";
+import { SignOut, useAccount } from "@/components/AccountGate";
 import { Dashboard, DailyReview, SettingsPage } from "@/components/Insights";
 const Assistant = dynamic(() => import("@/components/assistant/Assistant"), {
   ssr: false,
@@ -152,6 +153,7 @@ const emptyProgress: Progress = {
 };
 
 export default function Home() {
+  const { cloud, user } = useAccount();
   const [page, setPage] = useState<Page>("today");
   const [language, setLanguageState] = useState<Language>("en");
   const [theme, setTheme] = useState<Theme>("dark");
@@ -551,12 +553,13 @@ export default function Home() {
           <div className="profile">
             <div className="profile-avatar">ME</div>
             <div>
-              <strong>{uiText("我的空间")}</strong>
+              <strong>{user?.username || uiText("我的空间")}</strong>
               <span>
                 <i />
-                {uiText("本地存储 · 私人规划")}
+                {uiText(cloud ? "账号存储 · 私人规划" : "本地存储 · 私人规划")}
               </span>
             </div>
+            <SignOut />
           </div>
         </div>
       </aside>

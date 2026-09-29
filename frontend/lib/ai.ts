@@ -121,6 +121,7 @@ export async function streamChat(
     body: JSON.stringify({ conversation_id, message, attachment_ids, stream: true }),
   });
   if (!response.ok) {
+    if (response.status === 401) window.dispatchEvent(new Event("daymark-session-expired"));
     const body = await response.json().catch(() => ({}));
     throw new Error(
       typeof body.detail === "string"

@@ -1,0 +1,14 @@
+.account-screen { min-height: 100dvh; display: grid; grid-template-columns: 1.2fr 1fr; align-items: center; gap: 5rem; padding: clamp(2rem, 8vw, 8rem); background: var(--surface); color: var(--ink); }
+.account-intro { max-width: 650px; }
+.account-wordmark { font-size: 1.5rem; font-weight: 750; letter-spacing: .18em; }
+.account-intro h1 { font-size: clamp(2.8rem, 5vw, 5rem); font-weight: 550; letter-spacing: -.03em; line-height: 1.1; margin: 3rem 0; }
+.account-intro > span:last-child { font-size: .75rem; letter-spacing: .2em; opacity: .65; }
+.account-card { padding: 2.5rem; width: 100%; max-width: 440px; justify-self: end; }
+.account-card h2 { margin: 0 0 2rem; font-size: 1.8rem; }
+.account-card form, .account-card label { display: grid; gap: .7rem; }
+.account-card form { gap: 1.3rem; }
+.account-card input { min-height: 48px; width: 100%; }
+.account-card .button { justify-content: space-between; margin-top: .4rem; }
+.account-error { color: #c96565; overflow-wrap: anywhere; }
+.account-switch { margin-top: 1.5rem; color: inherit; background: transparent; border: 0; cursor: pointer; opacity: .75; }
+@media (max-width: 760px) { .account-screen { grid-template-columns: 1fr; gap: 2.5rem; padding: 2rem 1.5rem; } .account-card { justify-self: center; } .account-intro h1 { font-size: 2.7rem; margin: 1.5rem 0; } }

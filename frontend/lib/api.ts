@@ -6,6 +6,8 @@ export async function api<T>(path: string, options?: RequestInit): Promise<T> {
     headers: { "Content-Type": "application/json", ...options?.headers },
   });
   if (!response.ok) {
+    if (response.status === 401 && !path.startsWith("/auth/"))
+      window.dispatchEvent(new Event("daymark-session-expired"));
     let message = `${uiText("请求失败")} (${response.status})`;
     try {
       const body = await response.json();

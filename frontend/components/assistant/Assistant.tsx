@@ -1,4 +1,5 @@
 "use client";
+import { useAccount } from "@/components/AccountGate";
 import { uiText, uiFormat } from "@/lib/i18n";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -34,6 +35,7 @@ import ModelSettingsDrawer from "./ModelSettingsDrawer";
 import "./assistant.css";
 
 export default function Assistant({ changed }: { changed?: () => void }) {
+  const { cloud } = useAccount();
   const [health, setHealth] = useState<AIHealth | null>(null);
   const [healthError, setHealthError] = useState("");
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -402,9 +404,9 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           <label className="ai-mode-select">
             <span>AI Mode</span>
             <select value={mode} disabled={!health || busy} onChange={(e) => void changeMode(e.target.value as "auto" | "deepseek" | "local")}>
-              <option value="auto">Auto</option>
+              {!cloud && <option value="auto">Auto</option>}
               <option value="deepseek">DeepSeek</option>
-              <option value="local">Local Qwen</option>
+              {!cloud && <option value="local">Local Qwen</option>}
             </select>
           </label>
           <button

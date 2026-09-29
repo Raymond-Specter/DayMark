@@ -1,4 +1,5 @@
 "use client";
+import { useAccount } from "@/components/AccountGate";
 import { uiText, uiFormat, type Language } from "@/lib/i18n";
 import type { Theme } from "@/lib/theme";
 import { useEffect, useState } from "react";
@@ -512,6 +513,7 @@ export function SettingsPage({
   onThemeChange: (next: Theme) => void;
 }) {
   const [timezone, setTimezone] = useState(data.settings.timezone);
+  const { cloud } = useAccount();
   const [dayStart, setDayStart] = useState(data.settings.day_start);
   const [permission, setPermission] = useState("default");
   const [busy, setBusy] = useState(false);
@@ -682,7 +684,7 @@ export function SettingsPage({
           <div>
             <h3>{uiText("导出完整数据")}</h3>
             <p>
-              {uiText("将目标、项目、任务、完成记录与每日复盘导出为 JSON 文件。数据保存在本机 SQLite 数据库中。")}
+              {uiText(cloud ? "将你账号内的规划记录导出为 JSON 文件。" : "将目标、项目、任务、完成记录与每日复盘导出为 JSON 文件。数据保存在本机 SQLite 数据库中。")}
             </p>
           </div>
           <button

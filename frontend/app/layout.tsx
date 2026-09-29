@@ -7,6 +7,8 @@ import "./pink-theme.css";
 import "./morandi-theme.css";
 import "./mist-theme.css";
 import { themeInitScript } from "@/lib/theme";
+import AccountGate from "@/components/AccountGate";
+import "./account.css";
 export const metadata: Metadata = {
   title: "Daymark · Personal Planning System",
   description: "Personal planning for tasks, calendars, routines, and daily reviews.",
@@ -17,7 +19,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeInitScript }} /></head>
-      <body>{children}</body>
+      <body><AccountGate>{children}</AccountGate></body>
     </html>
   );
 }

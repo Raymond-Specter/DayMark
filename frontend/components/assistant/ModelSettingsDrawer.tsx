@@ -3,6 +3,7 @@ import { uiText, uiFormat } from "@/lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { aiRequest, type ModelSettings } from "@/lib/ai";
+import { useAccount } from "@/components/AccountGate";
 
 export default function ModelSettingsDrawer({
   value,
@@ -15,6 +16,7 @@ export default function ModelSettingsDrawer({
   saved: () => void;
   deepseekConfigured: boolean;
 }) {
+  const { cloud } = useAccount();
   const dialog = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState(value);
   const [models, setModels] = useState<{ name: string }[]>([]);
@@ -67,7 +69,7 @@ export default function ModelSettingsDrawer({
             <X size={20} />
           </button>
         </div>
-        <p>{uiText("设置保存在本机，下次对话自动沿用。每次仅生成一个回答。")}</p>
+        <p>{uiText(cloud ? "设置保存在你的账号中，下次对话自动沿用。" : "设置保存在本机，下次对话自动沿用。每次仅生成一个回答。")}</p>
         <div className="ai-key-panel">
           <label>
             DeepSeek API Key
@@ -81,18 +83,18 @@ export default function ModelSettingsDrawer({
             />
           </label>
           <small className={deepseekConfigured ? "configured" : ""}>
-            {deepseekConfigured ? uiText("✓ 已配置，仅保存在本机项目 .env") : uiText("未配置。Key 不会显示在页面、数据库或聊天记录中。")}
+            {cloud ? uiText(deepseekConfigured ? "✓ 已配置，在服务器加密保存，仅供你的账号使用。" : "Key 在服务器加密保存，不会回显或写入聊天记录。") : deepseekConfigured ? uiText("✓ 已配置，仅保存在本机项目 .env") : uiText("未配置。Key 不会显示在页面、数据库或聊天记录中。")}
           </small>
         </div>
         <label>
           AI Mode
           <select value={draft.mode} onChange={(e) => setDraft({ ...draft, mode: e.target.value as ModelSettings["mode"] })}>
-            <option value="auto">{uiText("Auto · DeepSeek 优先，安全时本地降级")}</option>
+            {!cloud && <option value="auto">{uiText("Auto · DeepSeek 优先，安全时本地降级")}</option>}
             <option value="deepseek">{uiText("DeepSeek · 仅云端")}</option>
-            <option value="local">{uiText("Local Qwen · 仅本地")}</option>
+            {!cloud && <option value="local">{uiText("Local Qwen · 仅本地")}</option>}
           </select>
         </label>
-        <label>
+        {!cloud && <label>
           Local Model
           <select
             value={draft.model}
@@ -109,7 +111,7 @@ export default function ModelSettingsDrawer({
               <option key={name}>{name}</option>
             ))}
           </select>
-        </label>
+        </label>}
         <label>
           Context Length
           <select
@@ -127,7 +129,7 @@ export default function ModelSettingsDrawer({
               ))}
           </select>
         </label>
-        <small>{uiText("8GB 显存默认 8192；出现显存压力时可降至 4096。")}</small>
+        {!cloud && <small>{uiText("8GB 显存默认 8192；出现显存压力时可降至 4096。")}</small>}
         <label>
           Temperature · {draft.temperature}
           <input

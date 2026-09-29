@@ -7,6 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from ..database import DATA
+from ..runtime import cloud_enabled, user_directory
 from ..models import KnowledgeDocument, LearningEntryDocument, Project, Task, now_iso
 from .attachments import SUPPORTED_EXTENSIONS, extract_text, safe_filename
 from .common import raw, require, today
@@ -14,6 +15,10 @@ from .common import raw, require, today
 KNOWLEDGE_DIR = DATA / "knowledge"
 MAX_DOCUMENT_BYTES = 25 * 1024 * 1024
 MAX_EXTRACTED_CHARS = 2_000_000
+
+
+def knowledge_directory(local_directory=None):
+    return user_directory() / "knowledge" if cloud_enabled() else (local_directory or KNOWLEDGE_DIR)
 
 
 def document_dict(db, row, include_text=False):
@@ -49,7 +54,7 @@ def validate_entry_links(db, values):
 def resolved_document_path(row):
     if not row.storage_path:
         raise HTTPException(404, "该文档没有原始文件")
-    root = KNOWLEDGE_DIR.resolve()
+    root = knowledge_directory().resolve()
     path = (root / row.storage_path).resolve()
     if root not in path.parents or not path.is_file():
         raise HTTPException(404, "文档文件不存在")
@@ -64,7 +69,7 @@ async def ingest_document(db, stream, *, filename, title, knowledge_date, projec
         raise HTTPException(415, "暂不支持这种文件。第一版支持文本、Markdown、常见代码、PDF 和 DOCX。")
     if project_id:
         require(db, Project, project_id)
-    temp_dir = KNOWLEDGE_DIR / ".tmp"
+    temp_dir = knowledge_directory() / ".tmp"
     temp_dir.mkdir(parents=True, exist_ok=True)
     temp_path = temp_dir / f"{uuid4().hex}.upload"
     digest, size = hashlib.sha256(), 0
@@ -87,7 +92,7 @@ async def ingest_document(db, stream, *, filename, title, knowledge_date, projec
                                              "document": document_dict(db, duplicate)})
         document_id = str(uuid4())
         relative = Path(sha256[:2]) / f"{document_id}{extension}"
-        destination = KNOWLEDGE_DIR / relative
+        destination = knowledge_directory() / relative
         destination.parent.mkdir(parents=True, exist_ok=True)
         os.replace(temp_path, destination)
         row = KnowledgeDocument(

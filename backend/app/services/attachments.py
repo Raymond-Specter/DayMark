@@ -14,11 +14,12 @@ from xml.etree import ElementTree
 
 from fastapi import HTTPException
 from ..database import DATA, ROOT
+from ..runtime import cloud_enabled, user_directory
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_EXTRACTED_CHARS = 9000
 UPLOAD_DIR = DATA / "uploads"
-OCR_MODEL_DIR = ROOT / "models" / "tesseract"
+OCR_MODEL_DIR = Path(os.environ.get("DAYMARK_OCR_MODEL_DIR", str(ROOT / "models" / "tesseract")))
 TEXT_EXTENSIONS = {
     ".txt", ".md", ".markdown", ".csv", ".json", ".html", ".htm", ".css",
     ".js", ".jsx", ".ts", ".tsx", ".py", ".java", ".c", ".cpp", ".h",
@@ -402,9 +403,10 @@ def _find_command(name, candidate=""):
 
 
 def save_upload(filename: str, content: bytes):
-    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    directory = user_directory() / "uploads" if cloud_enabled() else UPLOAD_DIR
+    directory.mkdir(parents=True, exist_ok=True)
     storage_name = f"{uuid4().hex}{Path(filename).suffix.lower()}"
-    (UPLOAD_DIR / storage_name).write_bytes(content)
+    (directory / storage_name).write_bytes(content)
     return storage_name
 
 
@@ -413,7 +415,8 @@ def delete_upload(storage_name: str):
 
 
 def attachment_path(storage_name: str):
-    return UPLOAD_DIR / Path(storage_name).name
+    directory = user_directory() / "uploads" if cloud_enabled() else UPLOAD_DIR
+    return directory / Path(storage_name).name
 
 
 def attachment_dict(row):

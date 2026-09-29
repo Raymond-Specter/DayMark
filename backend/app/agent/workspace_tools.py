@@ -14,7 +14,8 @@ from ..models import (AISettings, CalendarEvent, ChatAttachment, DailyReview, Go
 from ..schemas import EventIn, GoalIn, MilestoneIn, ProjectIn, ReviewIn, SettingsIn
 from ..services.attachments import attachment_path, safe_filename
 from ..services.common import live_tasks, raw, require, settings, today
-from ..services.knowledge import KNOWLEDGE_DIR, document_dict, entry_dict, validate_entry_links
+from ..services.knowledge import KNOWLEDGE_DIR, knowledge_directory, document_dict, entry_dict, validate_entry_links
+from ..runtime import cloud_enabled
 from ..services.planner import PlannerService
 from ..services.statistics import StatisticsService
 
@@ -212,7 +213,7 @@ class WorkspaceTools:
             raise HTTPException(409, "该文件已经保存在知识库中")
         document_id = str(uuid4()); extension = Path(filename).suffix.lower()
         relative = Path(digest[:2]) / f"{document_id}{extension}"
-        destination = KNOWLEDGE_DIR / relative; destination.parent.mkdir(parents=True, exist_ok=True)
+        destination = knowledge_directory(KNOWLEDGE_DIR) / relative; destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(source, destination)
         row = KnowledgeDocument(
             id=document_id, title=args.title or Path(filename).stem[:200], source_type="file",
@@ -306,6 +307,8 @@ class WorkspaceTools:
         data = ({"mode": row.mode, "model": row.model, "num_ctx": row.num_ctx,
                  "temperature": float(row.temperature), "think": row.think}
                 if row else ModelSettings().model_dump())
+        if cloud_enabled():
+            data["mode"] = "deepseek"
         return self.ok("已读取模型设置；API Key 不会返回。", data)
 
     def update_ai_settings(self, args):
@@ -315,6 +318,10 @@ class WorkspaceTools:
                    "temperature": float(row.temperature), "think": row.think}
                   if row else ModelSettings().model_dump())
         values.update(args.model_dump(exclude_unset=True))
+        if cloud_enabled():
+            if args.mode is not None and args.mode != "deepseek":
+                raise HTTPException(422, "网页版使用 DeepSeek 模式。")
+            values["mode"] = "deepseek"
         checked = ModelSettings(**values)
         if checked.model.endswith(":cloud") or "cloud" in checked.model.split(":")[-1]:
             raise HTTPException(422, "Local Model 只能选择本地 Ollama 模型")

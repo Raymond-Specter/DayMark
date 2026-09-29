@@ -6,10 +6,12 @@ import { Download, FileCode2, FileText, FolderOpen, LoaderCircle, Search, Upload
 import { api, dateLabel } from "@/lib/api";
 import type { KnowledgeDocument, Project } from "@/lib/types";
 import "./learning.css";
+import { useAccount } from "@/components/AccountGate";
 
 const documentTypes = [["note","笔记"],["slides","课件"],["assignment","作业"],["solution","解答"],["code","代码"],["paper","论文"],["output","产出"],["reflection","反思"],["reference","参考"],["exam","考试"],["other","其他"]] as const;
 
 export default function KnowledgeBase({ projects, today, notify }: { projects: Project[]; today: string; notify: (message: string, error?: boolean) => void }) {
+  const { cloud } = useAccount();
   const [documents, setDocuments] = useState<KnowledgeDocument[]>([]);
   const [project, setProject] = useState("all"); const [type, setType] = useState("all");
   const [query, setQuery] = useState(""); const [uploadOpen, setUploadOpen] = useState(false);
@@ -28,7 +30,7 @@ export default function KnowledgeBase({ projects, today, notify }: { projects: P
       notify(uiText("文档已保存到知识库")); setUploadOpen(false); if(fileInput.current)fileInput.current.value=""; setForm({...form,title:"",description:""}); await load();
     }catch(error){notify((error as Error).message,true);}finally{setBusy(false);}}
   return <div className="learning-page">
-    <section className="knowledge-hero panel"><div><span>PERSONAL FILE CENTER</span><h2>{uiText("资料留在本机，按学习日期归档。")}</h2><p>{uiText("上传只进行本地保存与解析，不会自动发送到 DeepSeek。")}</p></div><button className="button primary" onClick={()=>setUploadOpen(!uploadOpen)}><Upload size={17}/>{uiText("上传资料")}</button></section>
+    <section className="knowledge-hero panel"><div><span>PERSONAL FILE CENTER</span><h2>{uiText(cloud ? "你的资料，按学习日期归档。" : "资料留在本机，按学习日期归档。")}</h2><p>{uiText(cloud ? "资料保存在你的账号中，不会自动发送到 DeepSeek。" : "上传只进行本地保存与解析，不会自动发送到 DeepSeek。")}</p></div><button className="button primary" onClick={()=>setUploadOpen(!uploadOpen)}><Upload size={17}/>{uiText("上传资料")}</button></section>
     {uploadOpen&&<form className="learning-form panel" onSubmit={upload}><div className="panel-heading"><h2>{uiText("上传知识文档")}</h2><span>{uiText("文件 + 日期 + Project 即可")}</span></div><div className="learning-form-grid">
       <label className="wide upload-drop">{uiText("文件")}<input ref={fileInput} required type="file" accept=".txt,.md,.markdown,.csv,.json,.js,.ts,.py,.c,.cpp,.java,.sql,.yaml,.yml,.xml,.log,.ipynb,.pdf,.docx"/></label>
       <label>{uiText("知识日期")}<input required type="date" value={form.knowledge_date} onChange={(e)=>setForm({...form,knowledge_date:e.target.value})}/></label>

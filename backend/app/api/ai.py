@@ -6,7 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..ai_schemas import ChatIn, ConfirmationIn, ConversationIn, DeepSeekKeyIn, ModelSettings
-from ..database import SessionLocal, get_db
+from ..database import SessionLocal, get_db, tenant_factory
+from ..runtime import cloud_enabled, current_user_id
 from ..models import AISettings, AgentActionLog, ChatAttachment, Conversation
 from ..agent.agent_service import AgentService
 from ..agent.registry import build_registry
@@ -26,6 +27,13 @@ router = APIRouter(prefix="/api/ai", tags=["AI Assistant"])
 
 @lru_cache
 def service_instance():
+    return build_service(SessionLocal)
+
+
+tenant_services = {}
+
+
+def build_service(factory):
     # Construct lazily: an invalid AI configuration must not break Calendar.
     try:
         config = LLMConfig.from_env()
@@ -36,13 +44,18 @@ def service_instance():
         OllamaProvider(config.base_url), config,
     )
     registry = build_registry()
-    executor = ToolExecutor(registry, SessionLocal)
-    agent = AgentService(router_service, registry, executor, SessionLocal)
+    executor = ToolExecutor(registry, factory)
+    agent = AgentService(router_service, registry, executor, factory)
     return ConversationService(router_service, config, agent)
 
 
 async def get_service():
     # Resolve on the event loop, so simultaneous first requests share one owner.
+    if cloud_enabled():
+        user_id = current_user_id()
+        if user_id not in tenant_services:
+            tenant_services[user_id] = build_service(tenant_factory(user_id))
+        return tenant_services[user_id]
     return service_instance()
 
 
@@ -77,7 +90,7 @@ async def save_deepseek_key(data: DeepSeekKeyIn, service=Depends(get_service)):
         save_env_secret("DEEPSEEK_API_KEY", key)
     except (OSError, ValueError) as error:
         raise HTTPException(500 if isinstance(error, OSError) else 422,
-                            "API Key 无法保存到项目 .env。" if isinstance(error, OSError) else str(error))
+                            "API Key 无法保存。" if isinstance(error, OSError) else str(error))
     service.config.deepseek_api_key = key
     service.llm.config.deepseek_api_key = key
     service.llm.deepseek.provider.api_key = key
@@ -86,6 +99,8 @@ async def save_deepseek_key(data: DeepSeekKeyIn, service=Depends(get_service)):
 
 @router.get("/models")
 async def models(service=Depends(get_service)):
+    if cloud_enabled():
+        return []
     try:
         llm = service.llm.local if hasattr(service.llm, "local") else service.llm
         return await llm.list_models()
@@ -100,6 +115,8 @@ def settings(db: Session = Depends(get_db), service=Depends(get_service)):
 
 @router.put("/settings")
 async def save_settings(data: ModelSettings, db: Session = Depends(get_db), service=Depends(get_service)):
+    if cloud_enabled() and data.mode != "deepseek":
+        raise HTTPException(422, "网页版使用 DeepSeek 模式。")
     if service.active:
         raise HTTPException(409, "请先停止生成再修改模型设置。")
     if data.model.endswith(":cloud") or "cloud" in data.model.split(":")[-1]:

@@ -9,9 +9,9 @@
 ![Next.js](https://img.shields.io/badge/Next.js-16-111111?style=flat-square&logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-19-111111?style=flat-square&logo=react&logoColor=61DAFB)
 ![FastAPI](https://img.shields.io/badge/FastAPI-Python_3.10%2B-111111?style=flat-square&logo=fastapi&logoColor=009688)
-![SQLite](https://img.shields.io/badge/SQLite-Local_storage-111111?style=flat-square&logo=sqlite&logoColor=8AB4F8)
+![SQLite](https://img.shields.io/badge/SQLite-Persistent_storage-111111?style=flat-square&logo=sqlite&logoColor=8AB4F8)
 
-[功能](#功能) · [快速开始](#快速开始) · [AI Assistant](#ai-assistant) · [开发](#开发)
+[功能](#功能) · [快速开始](#快速开始) · [网页版部署](#网页版部署) · [AI Assistant](#ai-assistant) · [开发](#开发)
 
 <img src="frontend/public/images/gargantua-poster.jpg" alt="DayMark 首页使用的 Gargantua 黑洞背景" width="100%" />
 
@@ -19,7 +19,7 @@
 
 ## 关于 DayMark
 
-DayMark 是一个本地优先的个人规划与学习记录应用。打开首页，看到今天要做的事；切换到日历，安排时间；在目标与项目中查看整体进度，再把实际投入和学习资料留在同一个工作空间里。
+DayMark 是一个支持本机运行与多人网页版部署的个人规划与学习记录应用。打开首页，看到今天要做的事；切换到日历，安排时间；在目标与项目中查看整体进度，再把实际投入和学习资料留在同一个工作空间里。
 
 它提供规划的框架，具体内容由你决定。没有预置课程、考试或求职路线，也不会替你改动优先级。
 
@@ -35,6 +35,7 @@ DayMark 是一个本地优先的个人规划与学习记录应用。打开首页
 | **Learning Archive** | 记录学习、阅读、作业和研究的实际投入、进展、反思与下一步 |
 | **Knowledge Base** | 保存资料，按日期、项目和类型归档；聊天附件可通过 Agent 保存到知识库 |
 | **Daily Review & Insights** | 记录每日精力与实际投入，查看完成率、时间分布和计划 / 实际对比 |
+| **Accounts** | 网页版邀请码注册与登录，每个账号独立保存规划、文件、聊天和模型 Key |
 
 界面提供午夜黑（深色与视频首页）、樱花粉（奶白、柔粉与花形装饰）、莫兰迪（暖灰、鼠尾草绿与几何装饰）和雾蓝柔粉（低饱和蓝粉与几何装饰）四种风格，可在设置中即时切换，选择保存在本机浏览器。默认英文，可切换中文；语言切换不会翻译你自己输入的内容。
 
@@ -63,6 +64,48 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 .\backup.ps1            # 备份数据库
 ```
 
+## 网页版部署
+
+网页版使用 **Next.js + FastAPI + Caddy + 每账号独立 SQLite**，通过域名访问。任务、日历、文件、聊天和 AI 操作全部按账号隔离；注册需要邀请码，密码至少 12 位，登录有效期为 7 天。每个人在模型设置中填写自己的 DeepSeek Key。服务器不需要显卡或 Qwen 模型。
+
+准备一台 **Ubuntu 24.04、2 核 / 4 GB 内存、至少 60 GB 磁盘**的云服务器，作为小规模试用起点。购买域名，将其 A 记录指向服务器公网 IP。若有 AAAA 记录，必须同时指向可达的 IPv6 地址。开放 80 / 443，SSH 仅允许自己管理；无需开放 3000 / 8000。中国大陆服务器使用域名可能需要先完成服务商要求的备案。
+
+在服务器安装 [Docker Engine 与 Compose 插件](https://docs.docker.com/engine/install/ubuntu/)，然后执行：
+
+```bash
+git clone https://github.com/Raymond-Specter/DayMark.git
+cd DayMark
+
+# 替换成自己的域名；生成密钥文件，不覆盖已有配置
+python3 deploy/init_env.py --domain plan.example.com
+docker compose --env-file .env.cloud up --build -d
+
+# 查看运行状态与日志
+docker compose --env-file .env.cloud ps
+docker compose --env-file .env.cloud logs --tail=100 backend proxy
+```
+
+访问 `https://plan.example.com`。Caddy 自动申请和续期 HTTPS 证书。第一次注册前，在服务器上打开 `.env.cloud`，取出 `DAYMARK_INVITE_CODE`，只分享给需要注册的人。修改邀请码会关闭旧码注册，不影响已有账号。`.env.cloud` 中的加密密钥不能随意更换，否则已保存的 API Key 将无法解密；不要把文件提交到 Git 或贴进聊天。
+
+数据保存在 `daymark_data` 持久化卷：`accounts.db` 存账号与会话，`users/<账号 ID>/` 存个人规划数据库、聊天附件和知识文档。原本机数据不会自动复制到服务器。部署始终使用 **一个后端进程**；不要增加 workers 或启动多个共享此卷的后端实例。
+
+### 备份与更新
+
+```bash
+# 暂停后端写入，备份全部数据库、附件及密钥，再恢复后端
+sh deploy/backup.sh
+
+# 完成备份后更新
+git pull --ff-only
+docker compose --env-file .env.cloud up --build -d
+```
+
+将 `cloud-backups/` 中同一时间戳的 `.tar.gz` 与 `.env` **成对保存到服务器以外的私人存储**。恢复需要停止服务，将归档内容还原到数据卷，同时恢复对应 `.env.cloud`，再启动服务；不要混用不同版本的密钥。`docker compose down` 保留数据卷，**不要使用 `down -v`**，它会删除数据。
+
+云端每个账号的建库和升级使用同一套 Alembic 迁移。服务器重启后容器自动启动。提醒仍是站内通知，可通过宿主机 cron 定时执行 `docker compose --env-file .env.cloud exec -T backend python -m app.reminder_cli`；浏览器关闭时暂不支持推送或邮件。
+
+这是一台服务器上的邀请制版本：附件尚无累计容量配额，需监控磁盘使用；尚无自助密码找回，初期请妥善保存密码。上线前应在实际 Linux 服务器完成容器启动、HTTPS、上传 OCR 与备份恢复验证。
+
 ## AI Assistant
 
 AI 不只用于聊天，也可以通过工具创建和修改任务、重复规则、目标、项目、学习记录等内容。每轮提供全部已注册工具，由模型结合近期对话选择操作，无需使用固定句式。
@@ -81,7 +124,7 @@ Task 创建后会进入日历。已有记录的操作使用真实 ID，写入经
 
 在 **AI Assistant → 模型设置** 中填写并保存自己的 DeepSeek API Key，选择 `DeepSeek` 或 `Auto` 模式即可。也可以在根目录 `.env` 设置 `DEEPSEEK_API_KEY` 后重启；变量说明见 [.env.example](.env.example)。
 
-API Key 保存在本机 `.env`，不会被接口回显，也不会写进聊天记录或 Git。使用云端模型时，对话及其附件文本会发送给所选模型服务；未参与对话的知识库资料不会自动上传。
+本机模式的 API Key 保存在本机 `.env`；网页版则加密保存在各自账号中，不使用共享 Key。Key 不会被接口回显，也不会写进聊天记录或 Git。使用云端模型时，对话及其附件文本会发送给所选模型服务；未参与对话的知识库资料不会自动上传。
 
 ### Local Qwen
 
@@ -118,7 +161,7 @@ PDF 优先提取文字层，扫描版 PDF 使用本地 OCR。课表解析会结�
 
 ## 数据与运行说明
 
-规划记录保存在 SQLite，上传资料保存在本机项目的数据目录。Git 不包含你的数据库、附件、API Key 或本地模型。
+本机模式的规划记录保存在 SQLite，上传资料保存在项目数据目录。网页版的数据在服务器持久化卷中，每个账号有独立的 SQLite 数据库、附件与知识库目录；浏览器退出或本机关闭不影响服务器运行。Git 不包含你的数据库、附件、API Key 或本地模型。
 
 | 路径 | 内容 |
 | --- | --- |
@@ -142,7 +185,7 @@ PDF 优先提取文字层，扫描版 PDF 使用本地 OCR。课表解析会结�
 
 ## 当前范围
 
-- 目前是**单人本机应用**，只监听 `127.0.0.1`，尚未提供账号登录、多用户隔离或公网部署配置。
+- 提供单人本机模式和**邀请码注册的多人网页版**。网页版适合一台服务器上的小规模使用，默认最多 100 个账号；尚无邮件验证、密码找回、管理员页面或多服务器扩容。100 是注册上限，不是并发能力承诺。
 - 提醒支持准时及提前 10 / 30 / 60 / 1440 分钟。网页关闭、电脑睡眠或服务停止时，不能保证系统级实时通知；站内通知记录可在下次打开时查看。
 - Google Calendar 尚未接入。
 - 未完成任务不会自动删除或改期。重复任务默认提前生成 30 天，支持简单依赖；单次任务在同一天内安排。

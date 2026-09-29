@@ -2,11 +2,14 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
+from ...runtime import cloud_enabled
 
 ENV_PATH = Path(__file__).resolve().parents[4] / ".env"
 
 
 def load_env():
+    if cloud_enabled():
+        return
     # Explicit KEY=VALUE only: never execute a .env file as a shell script.
     path = ENV_PATH
     if path.exists():
@@ -22,6 +25,10 @@ def save_env_secret(name: str, value: str):
         raise ValueError("不支持的密钥名称")
     if not value or "\n" in value or "\r" in value:
         raise ValueError("API Key 格式无效")
+    if cloud_enabled():
+        from ...accounts import save_api_key
+        save_api_key(value)
+        return
     lines = ENV_PATH.read_text(encoding="utf-8-sig").splitlines() if ENV_PATH.exists() else []
     updated, found = [], False
     for line in lines:
@@ -78,6 +85,10 @@ class LLMConfig:
             deepseek_think_default=env_value("DEEPSEEK_THINKING_DEFAULT", "false").lower() == "true",
             default_mode=env_value("LLM_DEFAULT_MODE", "auto").lower(),
         )
+        if cloud_enabled():
+            from ...accounts import read_api_key
+            config.deepseek_api_key = read_api_key()
+            config.default_mode = "deepseek"
         parsed = urlparse(config.base_url)
         if parsed.scheme != "http" or parsed.hostname not in {"127.0.0.1", "localhost", "::1"} or parsed.username or parsed.password:
             raise ValueError("OLLAMA_BASE_URL 必须为本机 HTTP 地址")

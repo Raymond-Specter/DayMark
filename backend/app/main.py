@@ -1,5 +1,7 @@
 from contextlib import asynccontextmanager
 from datetime import date, timedelta
+import os
+from urllib.parse import urlparse
 
 from fastapi import Body, Depends, FastAPI, HTTPException, Request
 from fastapi.encoders import jsonable_encoder
@@ -9,7 +11,11 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import Session
 
-from .database import SessionLocal, get_db
+from .database import SessionLocal, get_db, tenant_factory
+from .runtime import cloud_enabled, user_context
+from . import accounts
+from .api.auth import router as auth_router
+from .api.ai import tenant_services
 from .models import (CalendarEvent, DailyReview, Goal, KnowledgeDocument, LearningEntry,
                      Milestone, Notification, Project, Routine, Task, TaskHistory, now_iso)
 from .schemas import EventIn, GoalIn, MilestoneIn, ProjectIn, ReviewIn, RoutineIn, SettingsIn, TaskAction, TaskIn
@@ -26,33 +32,68 @@ from .models import ChatMessage
 
 @asynccontextmanager
 async def lifespan(app):
-    # Migrations are explicit (setup/start scripts), never destructive auto-upgrades.
-    with SessionLocal() as db:
-        settings(db)
-        SchedulerService(db).materialize()
-        ReminderService(db).dispatch()
-        db.execute(update(ChatMessage).where(ChatMessage.status == "generating").values(status="stopped", error="后端重启，已保留上次保存的部分回答。"))
-        db.commit()
+    # Local migrations use setup/start; cloud tenants use versioned Alembic migrations.
+    factories = [SessionLocal]
+    if cloud_enabled():
+        origin = urlparse(os.environ.get("DAYMARK_PUBLIC_ORIGIN", ""))
+        if not origin.netloc or origin.username or origin.password or origin.path or origin.query or origin.fragment or origin.scheme != "https":
+            raise RuntimeError("DAYMARK_PUBLIC_ORIGIN must be an HTTPS origin")
+        accounts.initialize()
+        factories = [tenant_factory(user_id) for user_id in accounts.user_ids()]
+    for factory in factories:
+        with factory() as db:
+            settings(db)
+            SchedulerService(db).materialize()
+            ReminderService(db).dispatch()
+            db.execute(update(ChatMessage).where(ChatMessage.status == "generating").values(status="stopped", error="后端重启，已保留上次保存的部分回答。"))
+            db.commit()
     yield
     if get_ai_service.cache_info().currsize:
         service = get_ai_service()
         if service.active:
             await service.stop(service.active.conversation_id)
+    for service in tenant_services.values():
+        if service.active:
+            await service.stop(service.active.conversation_id)
+    tenant_services.clear()
 
 
-app = FastAPI(title="Personal Planning System", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Personal Planning System", version="1.0.0", lifespan=lifespan,
+              docs_url=None if cloud_enabled() else "/docs",
+              redoc_url=None if cloud_enabled() else "/redoc",
+              openapi_url=None if cloud_enabled() else "/openapi.json")
 app.include_router(ai_router)
 app.include_router(learning_router)
+app.include_router(auth_router)
 
 
 @app.middleware("http")
 async def local_mutation_guard(request: Request, call_next):
-    # The MVP is localhost-only. Reject browser mutations from other websites.
+    # Cloud requests use authenticated, request-local database/storage context.
+    token = None
+    if cloud_enabled():
+        public = {"/health", "/api/auth/session", "/api/auth/login", "/api/auth/register", "/api/auth/logout"}
+        if request.url.path not in public:
+            from starlette.concurrency import run_in_threadpool
+            user = await run_in_threadpool(accounts.session_user, request.cookies.get(accounts.COOKIE))
+            if not user:
+                return JSONResponse(status_code=401, content={"detail": "Please sign in"}, headers={"Cache-Control": "no-store"})
+            token = user_context.set(user["id"])
     if request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
-        if origin and origin not in {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000", "http://127.0.0.1:8000"}:
-            return JSONResponse(status_code=403, content={"detail": "仅允许本机应用修改数据"})
-    return await call_next(request)
+        allowed = {os.environ.get("DAYMARK_PUBLIC_ORIGIN")} if cloud_enabled() else {"http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:8000", "http://127.0.0.1:8000"}
+        if (cloud_enabled() or origin) and origin not in allowed:
+            if token is not None:
+                user_context.reset(token)
+            return JSONResponse(status_code=403, content={"detail": "Request origin is not allowed"})
+    try:
+        response = await call_next(request)
+        if cloud_enabled():
+            response.headers["Cache-Control"] = "no-store"
+        return response
+    finally:
+        if token is not None:
+            user_context.reset(token)
 
 
 @app.exception_handler(IntegrityError)
@@ -79,8 +120,13 @@ def commit(db):
 
 
 @app.get("/health")
-def health(db: Session = Depends(get_db)):
-    settings(db)
+def health():
+    if cloud_enabled():
+        with accounts.registry() as db:
+            db.execute("SELECT COUNT(*) FROM users").fetchone()
+    else:
+        with SessionLocal() as db:
+            settings(db)
     return {"status": "ok", "service": "personal-planning", "schema": "0007"}
 
 
