@@ -68,7 +68,36 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 
 网页版使用 **Next.js + FastAPI + Caddy + 每账号独立 SQLite**，通过域名访问。任务、日历、文件、聊天和 AI 操作全部按账号隔离；注册需要邀请码，密码至少 12 位，登录有效期为 7 天。每个人在模型设置中填写自己的 DeepSeek Key。服务器不需要显卡或 Qwen 模型。
 
-准备一台 **Ubuntu 24.04、2 核 / 4 GB 内存、至少 60 GB 磁盘**的云服务器，作为小规模试用起点。购买域名，将其 A 记录指向服务器公网 IP。若有 AAAA 记录，必须同时指向可达的 IPv6 地址。开放 80 / 443，SSH 仅允许自己管理；无需开放 3000 / 8000。中国大陆服务器使用域名可能需要先完成服务商要求的备案。
+准备一台 **Ubuntu 24.04、2 核 / 4 GB 内存、至少 60 GB 磁盘**的云服务器，作为小规模试用起点。可以使用下面的免费试用方案，也可以使用自己的域名，将 A 记录指向服务器公网 IP。若有 AAAA 记录，必须同时指向可达的 IPv6 地址。开放 80 / 443，SSH 仅允许自己管理；无需开放 3000 / 8000。中国大陆服务器使用域名可能需要先完成服务商要求的备案。
+
+### 免费部署试用
+
+推荐组合：**Oracle Cloud Always Free 实例 + sslip.io 免费地址 + Caddy HTTPS**。后端、数据库、附件和 OCR 都运行在云实例上，电脑关闭后仍可访问；GitHub 保存项目源码。GitHub Pages 不能运行这个 FastAPI 后端。
+
+1. 在 [Oracle Cloud](https://signup.cloud.oracle.com/) 注册并完成银行卡身份验证，不升级付费账户。选择 Home Region 前先确认可用区域，免费实例仅能在 Home Region 创建。
+2. 新建 **Ubuntu 24.04 / VM.Standard.A1.Flex / 2 OCPU / 6 GB RAM / 60 GB boot volume**，使用免费的系统镜像。确认控制台将实例标为 **Always Free eligible**，启动卷也在剩余免费额度内；不要以试用赠金抵扣来判断免费，也不要创建付费负载均衡或 NAT 网关。无免费容量就暂停，不更换付费实例。
+3. 使用带公网 IPv4 的公共子网。安全列表 / NSG 开放 TCP 80、443，TCP 22 只允许你的管理 IP；下载并妥善保管 SSH 私钥。不要把私钥提交到仓库或发送到聊天中。
+4. 用 SSH 登录服务器，在服务器执行下面的命令。脚本支持 ARM64 / AMD64 的 Ubuntu 24.04，从 Docker 官方签名软件源安装依赖，构建并启动服务，不创建或升级任何云资源。
+
+```bash
+git clone https://github.com/Raymond-Specter/DayMark.git
+cd DayMark
+
+# 将 YOUR_PUBLIC_IPV4 替换为控制台显示的服务器公网 IPv4
+bash deploy/setup_free_server.sh --public-ip YOUR_PUBLIC_IPV4
+```
+
+Ubuntu 默认用户使用 `sudo` 管理 Docker，后续命令请写成 `sudo docker compose ...`；备份运行 `sudo sh deploy/backup.sh`。脚本不会把普通用户加入拥有宿主机管理权限的 Docker 用户组。
+
+脚本会生成 `https://daymark-公网IP的连字符形式.sslip.io`，无需购买域名或手动配置 DNS。例如公网地址 `1.2.3.4` 对应 `https://daymark-1-2-3-4.sslip.io`（仅为格式示例）。容器启动不等于证书已签发：等待几分钟，再确认 HTTPS 可访问。若证书失败，检查公网 IP、80 / 443 的云端与系统防火墙，以及代理日志。不要关闭整台服务器的防火墙。
+
+已有 `.env.cloud` 的密钥不会覆盖；域名不一致时脚本停止。公网 IP 改变后，需保留原密钥、修改 `DAYMARK_DOMAIN` 并重新启动 Compose，访问地址也会改变。sslip.io 是第三方免费 DNS 服务，不能保证其长期可用性；以后可换成自己的域名。
+
+免费额度以 [Oracle 当前官方说明](https://docs.oracle.com/en-us/iaas/Content/FreeTier/freetier_topic-Always_Free_Resources.htm) 和账号控制台为准。2026-09-29 核对时，A1 免费月额度为 1,500 OCPU 小时 / 9,000 GB 小时（约 2 OCPU / 12 GB），启动与块存储合计 200 GB；这些额度与账号中的其他实例共享。免费实例可能无容量，低负载实例可能被回收，因此必须定期做站外备份。网站托管方案使用免费资源，**DeepSeek API 调用另按个人 API 账号计费**。
+
+第一次访问后，从服务器 `.env.cloud` 私下取出邀请码，注册两个账号验证数据隔离，再验证上传 PDF / OCR 和备份恢复。此脚本不会迁移本机已有数据。
+
+### 使用自己的域名
 
 在服务器安装 [Docker Engine 与 Compose 插件](https://docs.docker.com/engine/install/ubuntu/)，然后执行：
 
@@ -78,11 +107,11 @@ cd DayMark
 
 # 替换成自己的域名；生成密钥文件，不覆盖已有配置
 python3 deploy/init_env.py --domain plan.example.com
-docker compose --env-file .env.cloud up --build -d
+sudo docker compose --env-file .env.cloud up --build -d
 
 # 查看运行状态与日志
-docker compose --env-file .env.cloud ps
-docker compose --env-file .env.cloud logs --tail=100 backend proxy
+sudo docker compose --env-file .env.cloud ps
+sudo docker compose --env-file .env.cloud logs --tail=100 backend proxy
 ```
 
 访问 `https://plan.example.com`。Caddy 自动申请和续期 HTTPS 证书。第一次注册前，在服务器上打开 `.env.cloud`，取出 `DAYMARK_INVITE_CODE`，只分享给需要注册的人。修改邀请码会关闭旧码注册，不影响已有账号。`.env.cloud` 中的加密密钥不能随意更换，否则已保存的 API Key 将无法解密；不要把文件提交到 Git 或贴进聊天。
@@ -93,11 +122,11 @@ docker compose --env-file .env.cloud logs --tail=100 backend proxy
 
 ```bash
 # 暂停后端写入，备份全部数据库、附件及密钥，再恢复后端
-sh deploy/backup.sh
+sudo sh deploy/backup.sh
 
 # 完成备份后更新
 git pull --ff-only
-docker compose --env-file .env.cloud up --build -d
+sudo docker compose --env-file .env.cloud up --build -d
 ```
 
 将 `cloud-backups/` 中同一时间戳的 `.tar.gz` 与 `.env` **成对保存到服务器以外的私人存储**。恢复需要停止服务，将归档内容还原到数据卷，同时恢复对应 `.env.cloud`，再启动服务；不要混用不同版本的密钥。`docker compose down` 保留数据卷，**不要使用 `down -v`**，它会删除数据。
