@@ -68,7 +68,7 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 
 网页版使用 **Next.js + FastAPI + Caddy + 每账号独立 SQLite**，通过域名访问。任务、日历、文件、聊天和 AI 操作全部按账号隔离；注册需要邀请码，密码至少 12 位，登录有效期为 7 天。每个人在模型设置中填写自己的 DeepSeek Key。服务器不需要显卡或 Qwen 模型。
 
-准备一台 **Ubuntu 24.04、2 核 / 4 GB 内存、至少 60 GB 磁盘**的云服务器，作为小规模试用起点。可以使用下面的免费试用方案，也可以使用自己的域名，将 A 记录指向服务器公网 IP。若有 AAAA 记录，必须同时指向可达的 IPv6 地址。开放 80 / 443，SSH 仅允许自己管理；无需开放 3000 / 8000。中国大陆服务器使用域名可能需要先完成服务商要求的备案。
+准备一台 **Ubuntu 22.04 或 24.04、2 核 / 4 GB 内存、至少 60 GB 磁盘**的云服务器，作为小规模试用起点。可以使用下面的免费试用方案，也可以使用自己的域名，将 A 记录指向服务器公网 IP。若有 AAAA 记录，必须同时指向可达的 IPv6 地址。开放 80 / 443，SSH 仅允许自己管理；无需开放 3000 / 8000。中国大陆服务器使用域名可能需要先完成服务商要求的备案。
 
 ### 免费部署试用
 
@@ -77,7 +77,7 @@ powershell -ExecutionPolicy Bypass -File .\start.ps1
 1. 在 [Oracle Cloud](https://signup.cloud.oracle.com/) 注册并完成银行卡身份验证，不升级付费账户。选择 Home Region 前先确认可用区域，免费实例仅能在 Home Region 创建。
 2. 新建 **Ubuntu 24.04 / VM.Standard.A1.Flex / 2 OCPU / 6 GB RAM / 60 GB boot volume**，使用免费的系统镜像。确认控制台将实例标为 **Always Free eligible**，启动卷也在剩余免费额度内；不要以试用赠金抵扣来判断免费，也不要创建付费负载均衡或 NAT 网关。无免费容量就暂停，不更换付费实例。
 3. 使用带公网 IPv4 的公共子网。安全列表 / NSG 开放 TCP 80、443，TCP 22 只允许你的管理 IP；下载并妥善保管 SSH 私钥。不要把私钥提交到仓库或发送到聊天中。
-4. 用 SSH 登录服务器，在服务器执行下面的命令。脚本支持 ARM64 / AMD64 的 Ubuntu 24.04，从 Docker 官方签名软件源安装依赖，构建并启动服务，不创建或升级任何云资源。
+4. 用 SSH 登录服务器，在服务器执行下面的命令。脚本支持 ARM64 / AMD64 的 Ubuntu 22.04 和 24.04，从 Docker 官方签名软件源安装对应系统版本的依赖，构建并启动服务，不创建或升级任何云资源。
 
 ```bash
 git clone https://github.com/Raymond-Specter/DayMark.git

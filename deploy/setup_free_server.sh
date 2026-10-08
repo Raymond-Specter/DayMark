@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Run on a new Ubuntu 24.04 VM; this does not create or upgrade cloud resources.
+# Run on a new Ubuntu 22.04/24.04 VM; this does not create or upgrade cloud resources.
 set -euo pipefail
 umask 077
 
@@ -10,10 +10,15 @@ if [[ $# -ne 2 || "$1" != "--public-ip" ]]; then
 fi
 
 source /etc/os-release
-if [[ "$ID" != ubuntu || "$VERSION_ID" != 24.04 ]]; then
-    echo "This installer supports Ubuntu 24.04 only." >&2
+if [[ "$ID" != ubuntu ]]; then
+    echo "This installer supports Ubuntu 22.04 or 24.04 only." >&2
     exit 1
 fi
+case "$VERSION_ID" in
+    22.04) docker_suite=jammy ;;
+    24.04) docker_suite=noble ;;
+    *) echo "This installer supports Ubuntu 22.04 or 24.04 only." >&2; exit 1 ;;
+esac
 architecture=$(dpkg --print-architecture)
 if [[ "$architecture" != arm64 && "$architecture" != amd64 ]]; then
     echo "Use an ARM64 or AMD64 VM." >&2
@@ -63,7 +68,7 @@ if ! command -v docker >/dev/null; then
     "${admin[@]}" tee /etc/apt/sources.list.d/docker.sources >/dev/null <<EOF
 Types: deb
 URIs: https://download.docker.com/linux/ubuntu
-Suites: noble
+Suites: $docker_suite
 Components: stable
 Architectures: $architecture
 Signed-By: /etc/apt/keyrings/docker.asc
