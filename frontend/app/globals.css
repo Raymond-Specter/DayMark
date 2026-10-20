@@ -21,6 +21,17 @@ body {
   font-size: 14px;
   line-height: 1.6;
 }
+.site-registration {
+  padding: 10px 16px;
+  text-align: center;
+  color: var(--muted);
+  background: var(--surface);
+  font-size: 12px;
+}
+.site-registration a:hover,
+.site-registration a:focus-visible {
+  text-decoration: underline;
+}
 button,
 input,
 select,

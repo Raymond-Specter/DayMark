@@ -4,8 +4,8 @@ set -euo pipefail
 umask 077
 
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
-if [[ $# -ne 2 || "$1" != "--public-ip" ]]; then
-    echo "Usage: bash deploy/setup_free_server.sh --public-ip YOUR_PUBLIC_IPV4" >&2
+if [[ $# -ne 2 ]] || [[ "$1" != "--public-ip" && "$1" != "--domain" ]]; then
+    echo "Usage: bash deploy/setup_free_server.sh --domain YOUR_DOMAIN (or --public-ip YOUR_PUBLIC_IPV4)" >&2
     exit 2
 fi
 
@@ -25,7 +25,7 @@ if [[ "$architecture" != arm64 && "$architecture" != amd64 ]]; then
     exit 1
 fi
 command -v python3 >/dev/null || { echo "Install python3 first." >&2; exit 1; }
-hostname=$(python3 deploy/init_env.py --public-ip "$2" --print-domain)
+hostname=$(python3 deploy/init_env.py "$1" "$2" --print-domain)
 
 # Never silently replace encryption keys or change an existing site's origin.
 if [[ -e .env.cloud ]]; then
@@ -38,7 +38,7 @@ if domains != [sys.argv[1]]:
     raise SystemExit('Existing .env.cloud uses another domain. Keep its keys; update the domain explicitly or use the existing Compose deployment.')
 PY
 else
-    python3 deploy/init_env.py --public-ip "$2"
+    python3 deploy/init_env.py "$1" "$2"
 fi
 chmod 600 .env.cloud
 

@@ -8,6 +8,7 @@ import "./morandi-theme.css";
 import "./mist-theme.css";
 import { themeInitScript } from "@/lib/theme";
 import AccountGate from "@/components/AccountGate";
+import SiteRegistration from "@/components/SiteRegistration";
 import "./account.css";
 export const metadata: Metadata = {
   title: "Daymark · Personal Planning System",
@@ -19,7 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head><script dangerouslySetInnerHTML={{ __html: themeInitScript }} /></head>
-      <body><AccountGate>{children}</AccountGate></body>
+      <body><AccountGate>{children}</AccountGate><SiteRegistration /></body>
     </html>
   );
 }

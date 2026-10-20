@@ -99,20 +99,32 @@ Ubuntu 默认用户使用 `sudo` 管理 Docker，后续命令请写成 `sudo doc
 
 ### 使用自己的域名
 
-在服务器安装 [Docker Engine 与 Compose 插件](https://docs.docker.com/engine/install/ubuntu/)，然后执行：
+先将准备使用的域名（例如 `app.example.com`）的 A 记录指向服务器**当前**公网 IPv4，安全组开放 TCP 80 / 443，SSH 的 TCP 22 仅允许管理 IP。没有可用 IPv6 时不要添加 AAAA 记录。Ubuntu 22.04 / 24.04 可使用项目脚本安装 [Docker Engine 与 Compose 插件](https://docs.docker.com/engine/install/ubuntu/) 并启动：
 
 ```bash
+sudo apt-get update
+sudo apt-get install -y git python3
 git clone https://github.com/Raymond-Specter/DayMark.git
 cd DayMark
 
-# 替换成自己的域名；生成密钥文件，不覆盖已有配置
+# 替换成自己的域名，不带 https:// 或路径
 python3 deploy/init_env.py --domain plan.example.com
-sudo docker compose --env-file .env.cloud up --build -d
+
+# 中国内地站点：编辑 .env.cloud，新增一行 DAYMARK_ICP_RECORD=你的真实ICP备案号
+# 不要复制虚构备案号，也不要修改生成的加密密钥
+nano .env.cloud
+
+# 安装依赖、构建并后台运行；已有配置和数据不会被覆盖
+bash deploy/setup_free_server.sh --domain plan.example.com
 
 # 查看运行状态与日志
 sudo docker compose --env-file .env.cloud ps
 sudo docker compose --env-file .env.cloud logs --tail=100 backend proxy
 ```
+
+如果已安装可用的 Docker 和 Compose，也可以直接运行 `sudo docker compose --env-file .env.cloud up --build -d`。已克隆过项目则进入原目录更新，保留 `.env.cloud` 和数据卷；不要重复初始化密钥。脚本不会关闭系统防火墙，也不会申请付费云资源。
+
+`DAYMARK_ICP_RECORD` 会在构建时传入前端，让登录页与应用页面底部显示链接至工信部网站的备案号；留空则不显示。更改备案号后须重新构建前端。请按接入商要求展示真实备案信息，并在适用时办理公安联网备案。
 
 访问 `https://plan.example.com`。Caddy 自动申请和续期 HTTPS 证书。第一次注册前，在服务器上打开 `.env.cloud`，取出 `DAYMARK_INVITE_CODE`，只分享给需要注册的人。修改邀请码会关闭旧码注册，不影响已有账号。`.env.cloud` 中的加密密钥不能随意更换，否则已保存的 API Key 将无法解密；不要把文件提交到 Git 或贴进聊天。
 
