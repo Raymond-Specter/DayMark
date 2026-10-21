@@ -124,7 +124,35 @@ sudo docker compose --env-file .env.cloud logs --tail=100 backend proxy
 
 如果已安装可用的 Docker 和 Compose，也可以直接运行 `sudo docker compose --env-file .env.cloud up --build -d`。已克隆过项目则进入原目录更新，保留 `.env.cloud` 和数据卷；不要重复初始化密钥。脚本不会关闭系统防火墙，也不会申请付费云资源。
 
-`DAYMARK_ICP_RECORD` 会在构建时传入前端，让登录页与应用页面底部显示链接至工信部网站的备案号；留空则不显示。更改备案号后须重新构建前端。请按接入商要求展示真实备案信息，并在适用时办理公安联网备案。
+`DAYMARK_ICP_RECORD` 在前端容器启动时读取，让登录页与应用页面底部显示链接至工信部网站的备案号；留空则不显示。更改后重新创建前端容器即可，无需重新构建镜像。请按接入商要求展示真实备案信息，并在适用时办理公安联网备案。
+
+### Docker Hub 无法访问时：离线部署包
+
+仓库 Actions 中的 **Build offline deployment bundle** 使用标准 Ubuntu 运行器构建 AMD64 前后端镜像并拉取 Caddy，运行 Linux 后端测试和云模式启动检查后，发布到 [Releases](https://github.com/Raymond-Specter/DayMark/releases)。可手动运行；工作流文件更新推送到 main 时也会运行。仅公开仓库执行，不使用付费的大型运行器或 Actions 构建产物存储。
+
+下载对应预发布版本的 `daymark-linux-amd64.tar.gz` 和 `.sha256` 校验文件，上传到服务器的 `/root/DayMark/`。不要下载 GitHub 自动生成的 Source code 压缩包，它不包含镜像。保留服务器原有 `.env.cloud`（包括加密密钥、邀请码、域名和备案号）；包内不会提供或覆盖这个文件。
+
+以下命令适用于首次离线部署。已有数据时先备份；后续版本解压到新的目录，保留之前的包以便排查。
+
+```bash
+cd /root/DayMark
+sha256sum -c daymark-linux-amd64.tar.gz.sha256
+mkdir daymark-offline
+tar -xzf daymark-linux-amd64.tar.gz -C daymark-offline
+cd daymark-offline
+bash deploy/start_offline.sh /root/DayMark/.env.cloud
+```
+
+脚本校验包内文件，使用 `docker load` 导入镜像，以 `--no-build --pull never` 启动；固定使用 `daymark` Compose 项目名，复用原项目的数据与证书卷。基础包只支持 x86_64 / AMD64。若原部署使用了自定义项目名，请先调整启动脚本的 `-p`，否则会使用不同数据卷。后端镜像同时保留 `daymark-backend:latest` 别名，原仓库中的备份脚本仍可在原目录运行。
+
+后续启动与日志使用包内两份 Compose 配置，不再在服务器运行 `up --build`：
+
+```bash
+sudo docker compose -p daymark --env-file /root/DayMark/.env.cloud --env-file release.env -f compose.yaml -f compose.offline.yaml ps -a
+sudo docker compose -p daymark --env-file /root/DayMark/.env.cloud --env-file release.env -f compose.yaml -f compose.offline.yaml logs --tail=80 backend proxy
+```
+
+离线模式避免服务器下载镜像和构建依赖；HTTPS 首次签发、DeepSeek 调用仍需要服务器能访问对应外部服务。
 
 访问 `https://plan.example.com`。Caddy 自动申请和续期 HTTPS 证书。第一次注册前，在服务器上打开 `.env.cloud`，取出 `DAYMARK_INVITE_CODE`，只分享给需要注册的人。修改邀请码会关闭旧码注册，不影响已有账号。`.env.cloud` 中的加密密钥不能随意更换，否则已保存的 API Key 将无法解密；不要把文件提交到 Git 或贴进聊天。
 

@@ -1,0 +1,9 @@
+services:
+  backend:
+    image: daymark-backend:${DAYMARK_IMAGE_TAG:?Use the bundle release.env}
+    pull_policy: never
+  frontend:
+    image: daymark-frontend:${DAYMARK_IMAGE_TAG:?Use the bundle release.env}
+    pull_policy: never
+  proxy:
+    pull_policy: never

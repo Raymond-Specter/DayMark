@@ -10,6 +10,7 @@ import { themeInitScript } from "@/lib/theme";
 import AccountGate from "@/components/AccountGate";
 import SiteRegistration from "@/components/SiteRegistration";
 import "./account.css";
+export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "Daymark · Personal Planning System",
   description: "Personal planning for tasks, calendars, routines, and daily reviews.",

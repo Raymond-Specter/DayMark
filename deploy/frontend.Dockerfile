@@ -3,8 +3,6 @@ WORKDIR /app
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend ./
-ARG NEXT_PUBLIC_ICP_RECORD=""
-ENV NEXT_PUBLIC_ICP_RECORD=$NEXT_PUBLIC_ICP_RECORD
 ENV NEXT_TELEMETRY_DISABLED=1 BACKEND_URL=http://backend:8000
 RUN npm run build
 

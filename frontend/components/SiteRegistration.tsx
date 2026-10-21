@@ -1,5 +1,5 @@
 export default function SiteRegistration() {
-  const record = process.env.NEXT_PUBLIC_ICP_RECORD?.trim();
+  const record = process.env.DAYMARK_ICP_RECORD?.trim();
   if (!record) return null;
   return (
     <footer className="site-registration">

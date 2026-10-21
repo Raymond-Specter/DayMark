@@ -1,0 +1,93 @@
+name: Build offline deployment bundle
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/offline-deploy.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: offline-deployment
+  cancel-in-progress: false
+
+jobs:
+  bundle:
+    if: github.event.repository.private == false
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build application images and fetch Caddy
+        run: |
+          docker build -f deploy/backend.Dockerfile -t "daymark-backend:$GITHUB_SHA" -t daymark-backend:latest .
+          docker build -f deploy/frontend.Dockerfile -t "daymark-frontend:$GITHUB_SHA" -t daymark-frontend:latest .
+          docker pull caddy:2-alpine
+      - name: Run backend tests in the Linux image
+        run: docker run --rm --entrypoint python "daymark-backend:$GITHUB_SHA" -m pytest /app/backend/tests -q
+      - name: Test cloud startup and runtime registration footer
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import base64, os, secrets
+          from pathlib import Path
+          config = Path('.env.smoke')
+          config.write_text(
+              'DAYMARK_DOMAIN=deployment.invalid\n'
+              'DAYMARK_ENCRYPTION_KEY=' + base64.urlsafe_b64encode(secrets.token_bytes(32)).decode() + '\n'
+              'DAYMARK_INVITE_CODE=' + secrets.token_urlsafe(32) + '\n'
+              'DAYMARK_ICP_RECORD=runtime-footer-check\n'
+              'DAYMARK_IMAGE_TAG=' + os.environ['GITHUB_SHA'] + '\n'
+          )
+          config.chmod(0o600)
+          PY
+          compose=(docker compose -p daymark-package-check --env-file .env.smoke -f compose.yaml -f compose.offline.yaml)
+          trap '"${compose[@]}" down -v' EXIT
+          "${compose[@]}" up -d --no-build --pull never backend frontend
+          for attempt in $(seq 1 30); do
+            if "${compose[@]}" exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=2)" && \
+               "${compose[@]}" exec -T frontend node -e "fetch('http://127.0.0.1:3000').then(async r=>{if(!r.ok||!(await r.text()).includes('runtime-footer-check'))process.exit(1)}).catch(()=>process.exit(1))"; then
+              "${compose[@]}" exec -T backend python -c "import json,urllib.request; r=json.load(urllib.request.urlopen('http://127.0.0.1:8000/api/auth/session')); assert r['mode']=='cloud' and r['user'] is None"
+              "${compose[@]}" exec -T backend tesseract --list-langs
+              exit 0
+            fi
+            sleep 2
+          done
+          "${compose[@]}" logs --tail=80 backend frontend
+          exit 1
+      - name: Package images and deployment files
+        shell: bash
+        run: |
+          mkdir -p bundle/deploy dist
+          cp compose.yaml compose.offline.yaml bundle/
+          cp deploy/Caddyfile deploy/start_offline.sh deploy/init_env.py bundle/deploy/
+          printf 'DAYMARK_IMAGE_TAG=%s\n' "$GITHUB_SHA" > bundle/release.env
+          docker image inspect "daymark-backend:$GITHUB_SHA" "daymark-frontend:$GITHUB_SHA" caddy:2-alpine > bundle/image-info.json
+          docker save "daymark-backend:$GITHUB_SHA" daymark-backend:latest "daymark-frontend:$GITHUB_SHA" daymark-frontend:latest caddy:2-alpine | gzip -1 > bundle/images.tar.gz
+          (cd bundle && sha256sum compose.yaml compose.offline.yaml release.env image-info.json images.tar.gz deploy/Caddyfile deploy/start_offline.sh deploy/init_env.py > SHA256SUMS)
+          tar -czf dist/daymark-linux-amd64.tar.gz -C bundle .
+          test "$(stat -c %s dist/daymark-linux-amd64.tar.gz)" -lt 2000000000
+          (cd dist && sha256sum daymark-linux-amd64.tar.gz > daymark-linux-amd64.tar.gz.sha256)
+      - name: Publish tested offline bundle
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          tag="offline-${GITHUB_SHA:0:12}"
+          cat > /tmp/release-notes.md <<EOF
+          Tested Linux AMD64 container bundle for source commit $GITHUB_SHA.
+          Includes backend, frontend, Caddy, checksums, and the offline startup script.
+          No accounts, API keys, server .env.cloud, or user data are included.
+          Extract on the server and run: bash deploy/start_offline.sh /root/DayMark/.env.cloud
+          The package uses the existing daymark Compose project and data volume.
+          EOF
+          if gh release view "$tag" >/dev/null 2>&1; then
+            gh release upload "$tag" dist/daymark-linux-amd64.tar.gz dist/daymark-linux-amd64.tar.gz.sha256 --clobber
+          else
+            gh release create "$tag" dist/daymark-linux-amd64.tar.gz dist/daymark-linux-amd64.tar.gz.sha256 \
+              --target "$GITHUB_SHA" --title "DayMark offline deployment ${GITHUB_SHA:0:12}" \
+              --notes-file /tmp/release-notes.md --prerelease --latest=false
+          fi
