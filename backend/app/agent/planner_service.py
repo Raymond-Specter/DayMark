@@ -1,8 +1,8 @@
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 from sqlalchemy import select
 
-from ..models import CalendarEvent, Task
+from ..models import CalendarEvent, Routine, Task
 from ..schemas import TaskAction, TaskIn
 from ..services.common import require, settings
 from ..services.planner import PlannerService
@@ -28,7 +28,7 @@ class AgentPlannerService:
         rows = self.db.scalars(select(CalendarEvent).where(CalendarEvent.start < end, CalendarEvent.end > start))
         result = []
         for event in rows:
-            if event.task_id == exclude_task_id:
+            if exclude_task_id and event.task_id == exclude_task_id:
                 continue
             task = self.db.get(Task, event.task_id) if event.task_id else None
             if task and (task.deleted_at or task.status == "cancelled"):
@@ -41,8 +41,23 @@ class AgentPlannerService:
                 result.append({"start": "00:00", "end": "23:59", "title": event.title,
                                "task_id": None, "event_id": event.id})
                 continue
-            result.append({"start": event.start[11:16], "end": event.end[11:16], "title": event.title,
+            result.append({"start": max(event.start, start)[11:16], "end": min(event.end, end)[11:16], "title": event.title,
                            "task_id": event.task_id, "event_id": event.id})
+        # Reserve future fixed recurrences even beyond the materialized calendar.
+        # Existing occurrences (including exceptions/cancellations) remain authoritative.
+        from ..services.scheduler import matches
+        for routine in self.db.scalars(select(Routine).where(
+                Routine.active.is_(True), Routine.deleted_at.is_(None),
+                Routine.preferred_time.is_not(None), Routine.preferred_time != "")):
+            if not matches(routine, date.fromisoformat(day)):
+                continue
+            existing = self.db.scalar(select(Task.id).where(
+                Task.routine_id == routine.id, Task.occurrence_date == day))
+            if existing:
+                continue
+            finish = min(1439, minutes(routine.preferred_time) + routine.estimated_duration)
+            result.append({"start": routine.preferred_time, "end": clock(finish), "title": routine.name,
+                           "task_id": None, "routine_id": routine.id})
         return sorted(result, key=lambda item: item["start"])
 
     def conflicts(self, day, start_time, end_time, exclude_task_id=None):

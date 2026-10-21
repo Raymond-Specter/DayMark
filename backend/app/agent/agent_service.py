@@ -110,6 +110,10 @@ class AgentService:
             if content:
                 await emit({"event": "reset"})
             used_tools = True
+            # A question pauses the entire turn, including other parallel tool calls.
+            questions = [call for call in calls if call.get("function", {}).get("name") == "ask_user"]
+            if questions:
+                calls = questions[:1]
             working.append(Message("assistant", content, tool_calls=calls,
                                    reasoning_content=reasoning or None))
             for call in calls:
@@ -125,13 +129,21 @@ class AgentService:
                     provider=route.name if route else metrics.get("provider", "local"),
                     model=route.options.model if route else options.model,
                 )
-                if definition and definition.permission.value != "read" and result.success:
+                if definition and definition.permission.value != "read" and result.success and not result.clarification:
                     successful_write = True
                 affected.extend(result.affected_entities)
                 confirmation = result.confirmation or confirmation
                 await emit({"event": "tool_result", "tool": name, "success": result.success,
                             "message": result.message, "affected_entities": result.affected_entities,
-                            "confirmation": result.confirmation})
+                            "confirmation": result.confirmation, "clarification": result.clarification})
+                if result.clarification or result.confirmation:
+                    metrics["tool_count"] = tool_count
+                    if route:
+                        metrics.update({"provider": route.name, "model": route.options.model,
+                                        "fallback": route.fell_back})
+                    return AgentOutcome(content=result.message, metrics=metrics,
+                                        affected_entities=self._unique(affected),
+                                        confirmation=confirmation, clarification=result.clarification)
                 call_id = call.get("id") or f"{name}-{len(working)}"
                 working.append(Message("tool", result.model_dump_json(), tool_call_id=call_id))
                 if not result.success and not result.confirmation:

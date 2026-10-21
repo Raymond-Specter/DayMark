@@ -53,15 +53,25 @@ powershell -ExecutionPolicy Bypass -File .\scripts\dev.ps1
 
 删除任务和影响超过 3 个任务的单次改期会显示确认卡片。确认后后端执行保存的原始参数；取消则不修改数据。
 
+## 按每日时长规划与追问
+
+例如“以后每天学5小时托福，不动原来的安排”：Agent 先查询日历与重复规则，缺少起止日期、可用时段、是否分段及最短分段时，通过问题卡片让用户选择或自填。未选的选项不会被当成答案，也不会自动把全天空白当成学习时间。
+
+条件齐全后，`plan_daily_tasks` 按每天的真实占用计算新增时段，支持一天分成多段、每天时间不同。确认卡片显示逐日时间与分钟数；点击确认才统一创建任务，保留原有任务、独立事项和重复规则。任一天无法达到目标就显示缺口并追问，不自动少排或挪动旧任务。确认前日历已变化时整批拒绝，重新预览。未被后续修改的整批新增可通过 `undo_last_action` 撤销。
+
+已有托福等同类安排时，先确认是“每天总共5小时”还是“额外新增5小时”；只有经用户确认的真实任务ID（`counted_task_ids`）会计入目标，各天分别补足，不按标题猜测。预览会分别显示已计入分钟与新增分钟。新用户消息会使旧规划预览失效。
+
+单次规划最多31天，用户需明确本次截止日；当前不支持无限期自动续排。固定钟点的重复安排仍使用 Routine。通用 `ask_user` 支持1至4个问题、可选项和自由输入，刷新后恢复待答问题和规划预览。通过 `POST /api/ai/chat` 提交 `clarification_id` 与 `answers`，后端核验会话归属并将答案写入聊天上下文。普通文字回复也能继续对话。
+
 ## API 与事件
 
 - `GET /api/ai/health`：DeepSeek、Ollama、Agent、当前模式和设置状态。
 - `GET /api/ai/providers/status`：两个 Provider 的可用状态，不返回 Key。
 - `POST /api/ai/chat`：保留流式 SSE。
-- `POST /api/ai/confirm/{action_id}`：确认或取消保存的破坏性动作。
+- `POST /api/ai/confirm/{action_id}`：确认或取消保存的操作与规划预览。
 - `GET /api/ai/conversations/{id}/actions`：最近 100 条 Agent 写操作日志。
 
-SSE 事件包括 `start`、`provider_status`、`delta`、`reset`、`tool_status`、`tool_result`、`done`、`error`。`done` 包含本轮 `affected_entities` 和可选 `confirmation`。
+SSE 事件包括 `start`、`provider_status`、`delta`、`reset`、`tool_status`、`tool_result`、`done`、`error`。`tool_result` 与 `done` 包含受影响实体、可选的 `confirmation` 和 `clarification`。
 
 ## 验证命令
 

@@ -8,10 +8,11 @@ from sqlalchemy.orm import Session
 from ..ai_schemas import ChatIn, ConfirmationIn, ConversationIn, DeepSeekKeyIn, ModelSettings
 from ..database import SessionLocal, get_db, tenant_factory
 from ..runtime import cloud_enabled, current_user_id
-from ..models import AISettings, AgentActionLog, ChatAttachment, Conversation
+from ..models import AISettings, AgentActionLog, ChatAttachment, Conversation, PendingAgentAction
 from ..agent.agent_service import AgentService
 from ..agent.registry import build_registry
 from ..agent.tool_executor import ToolExecutor
+from ..agent.clarification import pending_question, question_dict
 from ..services.common import raw, require
 from ..services.conversation import ConversationService, history, read_settings
 from ..services.attachments import (MAX_FILE_BYTES, attachment_dict, attachment_path,
@@ -155,7 +156,13 @@ def conversation(key: str, db: Session = Depends(get_db)):
     for attachment in attachments:
         if attachment.message_id:
             attachment_map.setdefault(attachment.message_id, []).append(attachment)
-    return {**raw(conversation_row), "messages": [_message_dict(row, attachment_map) for row in history(db, key)]}
+    pending = db.scalar(select(PendingAgentAction).where(
+        PendingAgentAction.conversation_id == key, PendingAgentAction.status == "pending",
+        PendingAgentAction.tool_name != "ask_user",
+    ).order_by(PendingAgentAction.created_at.desc()))
+    return {**raw(conversation_row), "messages": [_message_dict(row, attachment_map) for row in history(db, key)],
+            "clarification": question_dict(pending_question(db, key)),
+            "confirmation": ToolExecutor._confirmation(pending) if pending else None}
 
 
 @router.post("/conversations/{key}/attachments", status_code=201)

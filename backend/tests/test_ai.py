@@ -7,6 +7,7 @@ from types import SimpleNamespace
 
 import httpx
 import pytest
+from fastapi import HTTPException
 from sqlalchemy import select
 
 from app.api.ai import get_service
@@ -329,6 +330,47 @@ def test_context_budget_keeps_latest_full_pairs():
     assert context[0].role == "system" and context[-1].content == "最新问题"
     assert context[-2].content.startswith("回答7")
     assert [m.role for m in context[1:-1]] == ["user", "assistant"] * ((len(context) - 2) // 2)
+
+
+def test_question_answers_resume_context_and_reject_incomplete_reply(client, ai, session_factory):
+    from app.agent.tool_executor import ToolExecutor
+    from app.agent.clarification import pending_question
+    key = conversation(client)
+    tools = ToolExecutor(build_registry(), session_factory)
+    asked = tools.execute(key, "ask_user", {"context": "每天学习托福5小时，不改变原安排", "questions": [
+        {"id": "split", "question": "能否分段？", "options": ["可以", "不可以"]},
+        {"id": "range", "question": "先规划多长时间？", "options": ["7天", "30天"]},
+    ]})
+    payload = {"conversation_id": key, "message": "补充规划信息", "stream": False,
+               "clarification_id": asked.clarification["id"], "answers": {"split": "可以"}}
+    assert client.post("/api/ai/chat", json=payload).status_code == 422
+    with session_factory() as db:
+        assert pending_question(db, key) is not None
+    payload["answers"]["range"] = "先排10天，每天晚上"
+    response = client.post("/api/ai/chat", json=payload)
+    assert response.status_code == 200 and response.json()["status"] == "completed"
+    assert "每天学习托福5小时" in ai[0].received[-1][-1].content
+    assert "先排10天，每天晚上" in ai[0].received[-1][-1].content
+    detail = client.get(f"/api/ai/conversations/{key}").json()
+    assert detail["clarification"] is None
+    assert "能否分段？：可以" in detail["messages"][-2]["content"]
+
+
+def test_new_user_turn_invalidates_old_daily_preview(client, ai, session_factory):
+    from app.agent.tool_executor import ToolExecutor
+    key = conversation(client)
+    tools = ToolExecutor(build_registry(), session_factory)
+    preview = tools.execute(key, "plan_daily_tasks", {
+        "title": "托福", "daily_minutes": 60, "start_date": "2026-09-22", "end_date": "2026-09-22",
+        "windows": [{"start_time": "09:00", "end_time": "12:00"}], "allow_split": False})
+    assert preview.confirmation
+    response = client.post("/api/ai/chat", json={"conversation_id": key, "message": "改为每天2小时", "stream": False})
+    assert response.status_code == 200
+    detail = client.get(f"/api/ai/conversations/{key}").json()
+    assert detail["confirmation"] is None
+    with pytest.raises(HTTPException) as error:
+        tools.confirm(key, preview.confirmation["action_id"], True)
+    assert error.value.status_code == 404
 
 
 def test_agent_manual_and_course_attachment_fit_default_context():

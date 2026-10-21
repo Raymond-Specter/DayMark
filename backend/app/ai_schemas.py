@@ -26,6 +26,8 @@ class ChatIn(AIInput):
     message: str = Field(min_length=1, max_length=12000)
     attachment_ids: list[str] = Field(default_factory=list, max_length=3)
     stream: bool = True
+    clarification_id: str | None = Field(default=None, max_length=36)
+    answers: dict[str, str] | None = None
 
 
 class ConfirmationIn(AIInput):

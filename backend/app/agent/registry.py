@@ -1,5 +1,6 @@
 from .permissions import ToolPermission as P
 from .tool_arguments import (
+    AskUserArgs, DailyPlanArgs,
     CreateEventArgs, CreateGoalArgs, CreateLearningEntryArgs, CreateMilestoneArgs,
     CreateProjectArgs, CreateRoutineArgs, CreateTaskArgs, DeleteTaskArgs, EmptyArgs,
     EventIdArgs, GetCalendarArgs, GetDocumentsArgs, GetFreeSlotsArgs, GetLearningEntriesArgs,
@@ -16,6 +17,8 @@ from .tool_registry import ToolDefinition, ToolRegistry
 def build_registry():
     registry = ToolRegistry()
     definitions = [
+        ("ask_user", "信息缺失或关键条件不明确时，用问题和选项向用户追问；可自填。调用后等待用户，不能继续写入。context只写已知条件。", AskUserArgs, P.READ, "正在整理需要确认的信息…"),
+        ("plan_daily_tasks", "按用户明确的日期、每日时长、可用时段和分段偏好逐日新增规划，单次最多31天。每天可用不同时间，保留所有旧安排。信息不足会追问；可行时返回逐日预览，用户确认后才创建。固定钟点重复仍用create_routine。", DailyPlanArgs, P.WRITE, "正在逐日检查空闲时间…"),
         ("get_today_tasks", "读取今天的全部真实任务。", EmptyArgs, P.READ, "正在读取今天的任务…"),
         ("get_tasks", "按日期、项目或状态查询真实任务。date/start_date/end_date 使用 YYYY-MM-DD。", GetTasksArgs, P.READ, "正在查询任务…"),
         ("get_calendar", "读取指定日期范围的任务和独立日历事项。", GetCalendarArgs, P.READ, "正在读取日历…"),

@@ -7,12 +7,13 @@ from time import monotonic
 from uuid import uuid4
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import sessionmaker
 
 from ..ai_schemas import ModelSettings
+from ..agent.clarification import answer_question
 from ..runtime import cloud_enabled
-from ..models import AISettings, ChatAttachment, ChatMessage, Conversation, now_iso
+from ..models import AISettings, ChatAttachment, ChatMessage, Conversation, PendingAgentAction, now_iso
 from .common import require
 from .llm.base import GenerationOptions, LLMError, Message
 from .llm.config import LLMConfig
@@ -91,6 +92,13 @@ class ConversationService:
         if self.active is not None:
             raise HTTPException(409, "已有一个回答正在生成，请先停止或等待完成。")
         conversation = require(db, Conversation, payload.conversation_id)
+        message = answer_question(db, conversation.id, payload.message, payload.clarification_id, payload.answers)
+        # A new user turn can change constraints; an older plan must not survive it.
+        db.execute(update(PendingAgentAction).where(
+            PendingAgentAction.conversation_id == conversation.id,
+            PendingAgentAction.tool_name == "plan_daily_tasks",
+            PendingAgentAction.status == "pending",
+        ).values(status="superseded", resolved_at=now_iso()))
         settings = read_settings(db, self.config)
         options = GenerationOptions(model=settings.model, num_ctx=settings.num_ctx,
                                     temperature=settings.temperature, think=settings.think,
@@ -105,9 +113,9 @@ class ConversationService:
         if len(selected_attachments) != len(set(payload.attachment_ids)) or any(row.message_id for row in selected_attachments):
             raise HTTPException(422, "附件不存在、已发送或不属于当前对话，请重新上传。")
         prompt = self.agent.system_prompt_for_conversation(db, conversation.id) if self.agent else SYSTEM_PROMPT
-        messages, truncated = build_context(rows, payload.message, options, prompt, attachment_map, selected_attachments)
+        messages, truncated = build_context(rows, message, options, prompt, attachment_map, selected_attachments)
         position = rows[-1].position + 1 if rows else 1
-        user = ChatMessage(conversation_id=conversation.id, role="user", content=payload.message, position=position)
+        user = ChatMessage(conversation_id=conversation.id, role="user", content=message, position=position)
         assistant = ChatMessage(conversation_id=conversation.id, role="assistant", content="", status="generating", model=options.model, position=position + 1)
         db.add(user)
         db.flush()
@@ -128,7 +136,7 @@ class ConversationService:
 
     async def _generate(self, run, factory, messages, options, mode):
         content, status, error, metrics = "", "completed", None, {}
-        affected_entities, confirmation = [], None
+        affected_entities, confirmation, clarification = [], None, None
         started, saved_at = monotonic(), monotonic()
         try:
             async def emit(event):
@@ -143,12 +151,13 @@ class ConversationService:
                     saved_at = monotonic()
 
             async def consume():
-                nonlocal content, metrics, affected_entities, confirmation
+                nonlocal content, metrics, affected_entities, confirmation, clarification
                 if self.agent:
                     outcome = await self.agent.run(run.conversation_id, messages, options, emit,
                                                    mode=mode, request_id=run.request_id)
                     content, metrics = outcome.content, outcome.metrics
                     affected_entities, confirmation = outcome.affected_entities, outcome.confirmation
+                    clarification = outcome.clarification
                     return
                 stream = self.llm.stream_chat(messages, options)
                 async for chunk in stream:
@@ -188,7 +197,8 @@ class ConversationService:
                 status, error = "error", "数据库保存失败，当前回答可能未完整保存，请检查磁盘和后端日志。"
             run.result = {"event": "error" if error else "done", "message_id": run.message_id, "conversation_id": run.conversation_id,
                           "content": content, "status": status, "error": error, "duration_ms": duration_ms,
-                          "metrics": metrics, "affected_entities": affected_entities, "confirmation": confirmation}
+                          "metrics": metrics, "affected_entities": affected_entities, "confirmation": confirmation,
+                          "clarification": clarification}
             run.queue.put_nowait(run.result)
             if self.active is run:
                 self.active = None

@@ -25,6 +25,8 @@ import {
   streamChat,
   type AIHealth,
   type AgentConfirmation,
+  type AgentClarification,
+  type ClarificationReply,
   type ChatEvent,
   type ChatAttachment,
   type ChatMessage,
@@ -32,6 +34,7 @@ import {
   type ConversationDetail,
 } from "@/lib/ai";
 import ModelSettingsDrawer from "./ModelSettingsDrawer";
+import ClarificationCard from "./ClarificationCard";
 import "./assistant.css";
 
 export default function Assistant({ changed }: { changed?: () => void }) {
@@ -52,6 +55,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [actionStatus, setActionStatus] = useState<string[]>([]);
   const [confirmation, setConfirmation] = useState<AgentConfirmation | null>(null);
+  const [clarification, setClarification] = useState<AgentClarification | null>(null);
+  const [confirming, setConfirming] = useState(false);
   const [attachments, setAttachments] = useState<ChatAttachment[]>([]);
   const [uploading, setUploading] = useState(false);
   const scroll = useRef<HTMLDivElement>(null);
@@ -96,6 +101,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       setAttachments([]);
       activeId.current = id;
       setMessages(detail.messages);
+      setClarification(detail.clarification || null);
+      setConfirmation(detail.confirmation || null);
       remember(id);
     } catch (e) {
       if (sequence === requestId.current) setError((e as Error).message);
@@ -140,20 +147,20 @@ export default function Assistant({ changed }: { changed?: () => void }) {
     setNotice("");
     setActionStatus([]);
     setConfirmation(null);
+    setClarification(null);
     setInput("");
     setAttachments([]);
     remember(null);
   }
-  async function send() {
+  async function send(override?: string, reply?: ClarificationReply) {
     const pendingAttachments = attachments;
-    const text = input.trim() || (pendingAttachments.length ? uiText("请阅读并分析附件。") : "");
-    if (!text || sending.current || loadingHistory || uploading) return;
+    const text = override || input.trim() || (pendingAttachments.length ? uiText("请阅读并分析附件。") : "");
+    if (!text || sending.current || loadingHistory || uploading || confirming) return;
     sending.current = true;
     setBusy(true);
     setError("");
     setNotice("");
     setActionStatus([]);
-    setConfirmation(null);
     let id = selected;
     const placeholder = `assistant-${Date.now()}`;
     let accepted = false;
@@ -195,6 +202,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
         (event: ChatEvent) => {
           if (event.event === "start") {
             accepted = true;
+            setConfirmation(null);
+            setClarification(null);
             if (event.context_trimmed)
               setNotice(
                 uiText("本次回答使用最近的完整对话；更早的聊天记录仍完整保存在历史中。"),
@@ -211,6 +220,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
               `${event.success ? "✓" : "!"} ${event.message || uiText("操作已处理")}`,
             ]);
             if (event.confirmation) setConfirmation(event.confirmation);
+            if (event.clarification) setClarification(event.clarification);
             if (event.affected_entities?.length) changed?.();
             return;
           }
@@ -239,8 +249,10 @@ export default function Assistant({ changed }: { changed?: () => void }) {
           if (event.event === "error")
             setError(event.error || uiText("模型生成失败，请重试。"));
           if (event.confirmation) setConfirmation(event.confirmation);
+          if (event.clarification) setClarification(event.clarification);
           if (event.affected_entities?.length) changed?.();
         },
+        reply,
       );
     } catch (e) {
       if (!accepted) {
@@ -261,6 +273,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             `/conversations/${id}`,
           );
           setMessages(detail.messages);
+          setClarification(detail.clarification || null);
+          setConfirmation(detail.confirmation || null);
         } catch {
           setNotice(uiText("暂时无法刷新聊天记录，请稍后重新打开此会话。"));
         }
@@ -348,7 +362,8 @@ export default function Assistant({ changed }: { changed?: () => void }) {
     }
   }
   async function resolveConfirmation(approve: boolean) {
-    if (!confirmation || !selected) return;
+    if (!confirmation || !selected || confirming || busy) return;
+    setConfirming(true);
     try {
       const result = await aiRequest<{
         success: boolean;
@@ -361,8 +376,12 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       setActionStatus((old) => [...old, `${result.success ? "✓" : "!"} ${result.message}`]);
       setConfirmation(null);
       if (result.affected_entities?.length) changed?.();
+      const detail = await aiRequest<ConversationDetail>("/conversations/" + selected);
+      setClarification(detail.clarification || null);
     } catch (e) {
       setError((e as Error).message);
+    } finally {
+      setConfirming(false);
     }
   }
   const mode = health?.settings.mode || "auto";
@@ -612,6 +631,9 @@ export default function Assistant({ changed }: { changed?: () => void }) {
             )}
           </div>
           <div className="ai-composer-area">
+            {clarification && <ClarificationCard key={clarification.id} question={clarification}
+              disabled={busy || loadingHistory || confirming || Boolean(health?.busy)}
+              submit={(text, reply) => void send(text, reply)} />}
             {actionStatus.length > 0 && (
               <div className="ai-action-status" aria-live="polite">
                 {actionStatus.slice(-4).map((status, index) => (
@@ -623,12 +645,23 @@ export default function Assistant({ changed }: { changed?: () => void }) {
               <div className="ai-confirm-action" role="status">
                 <strong>{uiText("AI 准备执行")}</strong>
                 <p>{confirmation.description}</p>
+                {confirmation.preview && <div className="ai-plan-preview">
+                  <table>
+                    <thead><tr><th>{uiText("日期")}</th><th>{uiText("已计入分钟")}</th><th>{uiText("新增时段")}</th><th>{uiText("新增分钟")}</th></tr></thead>
+                    <tbody>{confirmation.preview.days.map((day) => <tr key={day.date}>
+                      <td>{day.date}</td>
+                      <td>{day.existing_minutes}</td>
+                      <td>{day.slots.map((slot) => slot.start_time + "–" + slot.end_time).join(" / ")}</td>
+                      <td>{day.slots.reduce((sum, slot) => sum + slot.duration_minutes, 0)}</td>
+                    </tr>)}</tbody>
+                  </table>
+                </div>}
                 <small>{uiText("预计影响")} {confirmation.affected_count} {uiText("项")}</small>
                 <div>
-                  <button className="button secondary" onClick={() => void resolveConfirmation(false)}>
+                  <button className="button secondary" disabled={confirming || busy} onClick={() => void resolveConfirmation(false)}>
                     {uiText("取消")}
                   </button>
-                  <button className="button danger" onClick={() => void resolveConfirmation(true)}>
+                  <button className={confirmation.tool === "plan_daily_tasks" ? "button primary" : "button danger"} disabled={confirming || busy} onClick={() => void resolveConfirmation(true)}>
                     {uiText("确认")}
                   </button>
                 </div>

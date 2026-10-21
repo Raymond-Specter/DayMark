@@ -14,6 +14,7 @@ class ToolResult(BaseModel):
     affected_entities: list[dict] = Field(default_factory=list)
     error_code: str | None = None
     confirmation: dict | None = None
+    clarification: dict | None = None
 
 
 class AgentOutcome(BaseModel):
@@ -21,3 +22,4 @@ class AgentOutcome(BaseModel):
     metrics: dict = Field(default_factory=dict)
     affected_entities: list[dict] = Field(default_factory=list)
     confirmation: dict | None = None
+    clarification: dict | None = None

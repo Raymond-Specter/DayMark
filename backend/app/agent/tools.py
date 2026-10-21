@@ -4,7 +4,7 @@ from datetime import date, timedelta
 from fastapi import HTTPException
 from sqlalchemy import select, update
 
-from ..models import AgentActionLog, CalendarEvent, Routine, Task, now_iso
+from ..models import AgentActionLog, CalendarEvent, PendingAgentAction, Routine, Task, now_iso
 from ..schemas import RoutineIn, TaskAction, TaskIn
 from ..services.calendar import CalendarService
 from ..services.common import live_tasks, raw, require, sorted_tasks, task_dict, today
@@ -13,6 +13,9 @@ from ..services.scheduler import SchedulerService
 from .planner_service import AgentPlannerService, clock, minutes
 from .schemas import ToolResult
 from .workspace_tools import WorkspaceTools
+from .clarification import pending_question, question_dict
+from .daily_planner import DailyPlanner
+from .tool_arguments import AskUserArgs
 
 
 @dataclass
@@ -30,6 +33,55 @@ class PlanningTools(WorkspaceTools):
     def ok(self, message, data=None, affected=None, before=None, after=None):
         return Handled(ToolResult(success=True, message=message, data=data,
                                   affected_entities=affected or []), before, after)
+
+    def ask_user(self, args):
+        previous = pending_question(self.db, self.conversation_id)
+        if previous:
+            previous.status, previous.resolved_at = "superseded", now_iso()
+        row = PendingAgentAction(
+            conversation_id=self.conversation_id, tool_name="ask_user",
+            tool_arguments=args.model_dump(), description=args.context, affected_count=0,
+        )
+        self.db.add(row)
+        self.db.flush()
+        description = args.context + "\n\n" + "\n".join(
+            question.question + ("（" + " / ".join(question.options) + "）" if question.options else "")
+            for question in args.questions)
+        return Handled(ToolResult(success=True, message=description, clarification=question_dict(row)))
+
+    def plan_daily_tasks(self, args):
+        """Preparation only; execution requires the exact server-saved preview."""
+        questions = DailyPlanner(self.db).missing_questions(args)
+        if questions:
+            return self.ask_user(AskUserArgs(
+                context="请补充规划条件，尚未创建任务。已明确：" +
+                        DailyPlanner.summary(args), questions=questions))
+        PlannerService(self.db).validate_links({"project_id": args.project_id})
+        preview = DailyPlanner(self.db).preview(args)
+        shortage = [day for day in preview["days"] if day["shortfall_minutes"]]
+        if shortage:
+            details = "；".join(f"{day['date']} 缺 {day['shortfall_minutes']} 分钟" for day in shortage)
+            handled = self.ask_user(AskUserArgs(
+                context=(DailyPlanner.summary(args) + f"。保留原有安排后：{details}。未创建任何任务。")[:2000],
+                questions=[{"id": "shortage", "question": "时间不足时，你希望怎样调整？原有安排会保持不变。",
+                            "options": ["修改可用时段", "调整每日目标时长", "修改规划日期范围"]}]))
+            handled.result.data = preview
+            return handled
+        return self.ok("逐日安排已计算，等待用户确认；尚未创建任务。", preview)
+
+    def apply_daily_plan(self, args, preview):
+        tasks = []
+        for day in preview["days"]:
+            for slot in day["slots"]:
+                task, conflicts = self.planner.create(
+                    args.title, day["date"], slot["start_time"], slot["end_time"],
+                    slot["duration_minutes"], args.project_id)
+                if conflicts:
+                    raise ValueError("日历已变化，未写入本次规划，请重新预览。")
+                tasks.append(task)
+        return self.ok(f"已新增 {len(tasks)} 个任务，覆盖 {len(preview['days'])} 天，原有安排保持不变。",
+                       preview, [{"type": "task", "id": task.id} for task in tasks],
+                       None, {"tasks": [raw(task) for task in tasks]})
 
     def get_today_tasks(self, _):
         rows = [task_dict(self.db, task) for task in live_tasks(self.db) if task.date == today(self.db).isoformat()]
@@ -283,7 +335,7 @@ class PlanningTools(WorkspaceTools):
         return self.ok(f"已删除任务“{task.title}”。", None, [{"type": "task", "id": task.id}], before, raw(task))
 
     def undo_last_action(self, _):
-        reversible = {"create_task", "schedule_task", "update_task", "reschedule_task", "complete_task", "replan_day"}
+        reversible = {"create_task", "schedule_task", "update_task", "reschedule_task", "complete_task", "replan_day", "plan_daily_tasks"}
         log = self.db.scalar(select(AgentActionLog).where(
             AgentActionLog.conversation_id == self.conversation_id,
             AgentActionLog.status == "success", AgentActionLog.undone_at.is_(None),
@@ -292,6 +344,15 @@ class PlanningTools(WorkspaceTools):
         if not log:
             return Handled(ToolResult(success=False, error_code="NOTHING_TO_UNDO", message="没有可以撤销的最近操作。"))
         state = log.after_state or {}
+        if log.tool_name == "plan_daily_tasks":
+            tasks = [require(self.db, Task, row["id"]) for row in state["tasks"]]
+            if any(task.version != saved["version"] for task, saved in zip(tasks, state["tasks"])):
+                raise ValueError("本次规划中的任务已被修改，请单独处理，不会覆盖后续修改。")
+            for task in tasks:
+                PlannerService(self.db).delete(task, task.version)
+            log.undone_at, log.status = now_iso(), "undone"
+            return self.ok(f"已撤销本次新增的 {len(tasks)} 个任务。",
+                           affected=[{"type": "task", "id": task.id} for task in tasks])
         if log.tool_name == "replan_day":
             restored = []
             for before in (log.before_state or {}).get("tasks", []):

@@ -1115,3 +1115,29 @@
 .ai-settings-drawer input:focus-visible, .ai-settings-drawer select:focus-visible {
   outline-color: var(--ai-accent, #acbcf7);
 }
+
+/* Planning questions and previews use the active Assistant theme. */
+.ai-clarification {
+  display: grid;
+  gap: 16px;
+  max-height: min(48vh, 440px);
+  overflow-y: auto;
+  padding: 18px;
+  margin-bottom: 14px;
+  border: 1px solid var(--ai-border);
+  border-radius: 10px;
+  background: var(--ai-surface);
+  color: var(--ai-text);
+}
+.ai-clarification fieldset { min-width: 0; border: 0; padding: 0; margin: 0; }
+.ai-clarification legend { font-size: 14px; margin-bottom: 10px; }
+.ai-question-options { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.ai-question-options button {
+  border: 1px solid var(--ai-border); border-radius: 7px; padding: 8px 12px;
+  background: transparent; color: inherit; cursor: pointer;
+}
+.ai-question-options button[aria-pressed="true"] { border-color: var(--ai-accent); background: color-mix(in srgb, var(--ai-accent) 15%, var(--ai-surface)); }
+.ai-clarification input { width: 100%; border: 1px solid var(--ai-border); border-radius: 6px; padding: 10px; color: inherit; background: transparent; }
+.ai-plan-preview { max-height: 240px; overflow: auto; margin: 12px 0; }
+.ai-plan-preview table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.ai-plan-preview th, .ai-plan-preview td { padding: 9px 12px; border-bottom: 1px solid var(--ai-border); white-space: nowrap; }

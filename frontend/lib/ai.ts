@@ -47,6 +47,17 @@ export interface ChatAttachment {
 }
 export interface ConversationDetail extends Conversation {
   messages: ChatMessage[];
+  clarification?: AgentClarification | null;
+  confirmation?: AgentConfirmation | null;
+}
+export interface AgentClarification {
+  id: string;
+  context: string;
+  questions: { id: string; question: string; options: string[] }[];
+}
+export interface ClarificationReply {
+  clarification_id: string;
+  answers: Record<string, string>;
 }
 export interface ChatEvent {
   event:
@@ -70,6 +81,7 @@ export interface ChatEvent {
   success?: boolean;
   affected_entities?: { type: string; id: string }[];
   confirmation?: AgentConfirmation | null;
+  clarification?: AgentClarification | null;
   provider?: "deepseek" | "local";
   model?: string;
   fallback?: boolean;
@@ -80,6 +92,10 @@ export interface AgentConfirmation {
   arguments: Record<string, unknown>;
   description: string;
   affected_count: number;
+  preview?: {
+    daily_minutes: number;
+    days: { date: string; existing_minutes: number; slots: { start_time: string; end_time: string; duration_minutes: number }[] }[];
+  } | null;
 }
 export interface ToolResult {
   success: boolean;
@@ -113,12 +129,13 @@ export async function streamChat(
   attachment_ids: string[],
   signal: AbortSignal,
   receive: (event: ChatEvent) => void,
+  reply?: ClarificationReply,
 ) {
   const response = await fetch("/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal,
-    body: JSON.stringify({ conversation_id, message, attachment_ids, stream: true }),
+    body: JSON.stringify({ conversation_id, message, attachment_ids, stream: true, ...reply }),
   });
   if (!response.ok) {
     if (response.status === 401) window.dispatchEvent(new Event("daymark-session-expired"));

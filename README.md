@@ -31,7 +31,7 @@ DayMark 是一个支持本机运行与多人网页版部署的个人规划与学
 | **Calendar** | 日 / 周 / 月视图，拖动任务调整日期和时间，管理独立日历事项 |
 | **Goals & Projects** | 用 Goal → Project → Milestone → Task 组织规划，查看真实完成进度 |
 | **Tasks & Routines** | 创建、编辑、完成、延期和取消任务；支持重复规则及简单依赖 |
-| **AI Assistant** | 用自然语言操作规划数据，支持 DeepSeek Cloud 和本地 Qwen |
+| **AI Assistant** | 用自然语言操作数据；缺信息时给选项追问，按每日时长生成弹性规划与确认预览，支持 DeepSeek 和本地 Qwen |
 | **Learning Archive** | 记录学习、阅读、作业和研究的实际投入、进展、反思与下一步 |
 | **Knowledge Base** | 保存资料，按日期、项目和类型归档；聊天附件可通过 Agent 保存到知识库 |
 | **Daily Review & Insights** | 记录每日精力与实际投入，查看完成率、时间分布和计划 / 实际对比 |

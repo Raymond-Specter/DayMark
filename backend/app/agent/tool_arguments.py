@@ -28,6 +28,76 @@ class EmptyArgs(ToolArguments):
     pass
 
 
+class UserQuestion(ToolArguments):
+    id: str = Field(min_length=1, max_length=40, pattern=r"^[a-zA-Z0-9_]+$")
+    question: str = Field(min_length=1, max_length=300)
+    options: list[str] = Field(default_factory=list, max_length=5)
+
+    @field_validator("options")
+    @classmethod
+    def valid_options(cls, value):
+        if any(not option.strip() or len(option) > 200 for option in value) or len(set(value)) != len(value):
+            raise ValueError("选项必须简短且不重复")
+        return value
+
+
+class AskUserArgs(ToolArguments):
+    context: str = Field(min_length=1, max_length=2000, description="用户已明确的目标和条件，不填推测")
+    questions: list[UserQuestion] = Field(min_length=1, max_length=4)
+
+    @model_validator(mode="after")
+    def unique_ids(self):
+        if len({question.id for question in self.questions}) != len(self.questions):
+            raise ValueError("问题 ID 不能重复")
+        return self
+
+
+class PlanningWindow(ToolArguments):
+    start_time: str
+    end_time: str
+
+    @model_validator(mode="after")
+    def valid_window(self):
+        for value in (self.start_time, self.end_time):
+            if not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", value):
+                raise ValueError("时间必须为 HH:MM")
+        if self.end_time <= self.start_time:
+            raise ValueError("可用时段结束必须晚于开始")
+        return self
+
+
+class DailyPlanArgs(ToolArguments):
+    title: str = Field(min_length=1, max_length=200)
+    daily_minutes: int = Field(ge=1, le=1440, description="每日目标分钟数；默认全部新增，只有用户明确选定的 counted_task_ids 会计入目标")
+    counted_task_ids: list[str] = Field(default_factory=list, max_length=1000,
+                                        description="已查询到且用户明确同意计入每日目标的旧任务ID；不按标题自动匹配")
+    start_date: str | None = None
+    end_date: str | None = Field(default=None, description="用户确认的规划截止日，单次最多31天")
+    windows: list[PlanningWindow] | None = Field(default=None, min_length=1, max_length=10,
+                                                description="用户确认可用于该计划的每日时段，排除睡眠和用餐等")
+    allow_split: bool | None = Field(default=None, description="是否允许每天拆成多个学习时段，不能猜测")
+    min_session_minutes: int | None = Field(default=None, ge=15, le=1440)
+    weekdays: list[int] = Field(default_factory=lambda: list(range(7)), min_length=1, max_length=7)
+    project_id: str | None = None
+
+    _dates = field_validator("start_date", "end_date")(lambda value: Date.fromisoformat(value).isoformat() if value else value)
+
+    @field_validator("weekdays")
+    @classmethod
+    def valid_weekdays(cls, value):
+        if len(set(value)) != len(value) or any(day < 0 or day > 6 for day in value):
+            raise ValueError("星期使用0至6且不重复")
+        return value
+
+    @model_validator(mode="after")
+    def valid_dates(self):
+        if self.start_date and self.end_date and self.end_date < self.start_date:
+            raise ValueError("结束日期不能早于开始日期")
+        if self.allow_split and self.min_session_minutes and self.min_session_minutes > self.daily_minutes:
+            raise ValueError("最短分段不能大于每日目标")
+        return self
+
+
 class GetTasksArgs(DateRange):
     project_id: str | None = None
     status: Literal["pending", "completed", "overdue", "rescheduled", "cancelled"] | None = None
