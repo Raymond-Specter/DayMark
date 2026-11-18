@@ -5,7 +5,7 @@ const englishUi: Record<string, string> = translations;
 export type Language = "en" | "zh";
 
 const storageKey = "daymark.language";
-let language: Language = "en";
+let language: Language = "zh";
 
 export function getLanguage(): Language {
   return language;
@@ -18,9 +18,9 @@ export function browserLocale(): string {
 export function loadLanguage(): Language {
   if (typeof window === "undefined") return language;
   try {
-    language = window.localStorage.getItem(storageKey) === "zh" ? "zh" : "en";
+    language = window.localStorage.getItem(storageKey) === "en" ? "en" : "zh";
   } catch {
-    language = "en";
+    language = "zh";
   }
   document.documentElement.lang = language === "en" ? "en" : "zh-CN";
   return language;

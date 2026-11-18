@@ -155,7 +155,7 @@ const emptyProgress: Progress = {
 export default function Home() {
   const { cloud, guest, user } = useAccount();
   const [page, setPage] = useState<Page>("today");
-  const [language, setLanguageState] = useState<Language>("en");
+  const [language, setLanguageState] = useState<Language>("zh");
   const [theme, setTheme] = useState<Theme>("dark");
   const [mobileNav, setMobileNav] = useState(false);
   const [data, setData] = useState<Bootstrap | null>(null);
