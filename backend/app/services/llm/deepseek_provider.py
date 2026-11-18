@@ -29,12 +29,12 @@ class DeepSeekProvider:
 
     def _configured(self):
         if not self.api_key:
-            raise LLMError("not_configured", "DeepSeek API Key 未配置，请在项目 .env 中设置 DEEPSEEK_API_KEY。", 503)
+            raise LLMError("not_configured", "DeepSeek API Key 未配置，请在模型设置中填写。", 503)
 
     @staticmethod
     def _error(status: int, body: str):
         if status in {401, 403}:
-            return LLMError("auth_failed", "DeepSeek 鉴权失败，请检查后端 .env 中的 API Key。", 401)
+            return LLMError("auth_failed", "DeepSeek 鉴权失败，请在模型设置中检查 API Key。", 401)
         if status == 429:
             return LLMError("rate_limited", "DeepSeek 请求过于频繁或额度不足，请稍后重试。", 429)
         if status >= 500:

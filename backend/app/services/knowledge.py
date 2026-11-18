@@ -7,7 +7,7 @@ from fastapi import HTTPException
 from sqlalchemy import select
 
 from ..database import DATA
-from ..runtime import cloud_enabled, user_directory
+from ..runtime import web_enabled, user_directory
 from ..models import KnowledgeDocument, LearningEntryDocument, Project, Task, now_iso
 from .attachments import SUPPORTED_EXTENSIONS, extract_text, safe_filename
 from .common import raw, require, today
@@ -18,7 +18,7 @@ MAX_EXTRACTED_CHARS = 2_000_000
 
 
 def knowledge_directory(local_directory=None):
-    return user_directory() / "knowledge" if cloud_enabled() else (local_directory or KNOWLEDGE_DIR)
+    return user_directory() / "knowledge" if web_enabled() else (local_directory or KNOWLEDGE_DIR)
 
 
 def document_dict(db, row, include_text=False):

@@ -153,7 +153,7 @@ const emptyProgress: Progress = {
 };
 
 export default function Home() {
-  const { cloud, user } = useAccount();
+  const { cloud, guest, user } = useAccount();
   const [page, setPage] = useState<Page>("today");
   const [language, setLanguageState] = useState<Language>("en");
   const [theme, setTheme] = useState<Theme>("dark");
@@ -553,10 +553,10 @@ export default function Home() {
           <div className="profile">
             <div className="profile-avatar">ME</div>
             <div>
-              <strong>{user?.username || uiText("我的空间")}</strong>
+              <strong>{guest ? uiText("访客空间") : user?.username || uiText("我的空间")}</strong>
               <span>
                 <i />
-                {uiText(cloud ? "账号存储 · 私人规划" : "本地存储 · 私人规划")}
+                {uiText(guest ? "浏览器存储 · 访客模式" : cloud ? "账号存储 · 私人规划" : "本地存储 · 私人规划")}
               </span>
             </div>
             <SignOut />

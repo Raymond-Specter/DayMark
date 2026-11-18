@@ -15,7 +15,7 @@ from ..schemas import EventIn, GoalIn, MilestoneIn, ProjectIn, ReviewIn, Setting
 from ..services.attachments import attachment_path, safe_filename
 from ..services.common import live_tasks, raw, require, settings, today
 from ..services.knowledge import KNOWLEDGE_DIR, knowledge_directory, document_dict, entry_dict, validate_entry_links
-from ..runtime import cloud_enabled
+from ..runtime import web_enabled
 from ..services.planner import PlannerService
 from ..services.statistics import StatisticsService
 
@@ -307,7 +307,7 @@ class WorkspaceTools:
         data = ({"mode": row.mode, "model": row.model, "num_ctx": row.num_ctx,
                  "temperature": float(row.temperature), "think": row.think}
                 if row else ModelSettings().model_dump())
-        if cloud_enabled():
+        if web_enabled():
             data["mode"] = "deepseek"
         return self.ok("已读取模型设置；API Key 不会返回。", data)
 
@@ -318,7 +318,7 @@ class WorkspaceTools:
                    "temperature": float(row.temperature), "think": row.think}
                   if row else ModelSettings().model_dump())
         values.update(args.model_dump(exclude_unset=True))
-        if cloud_enabled():
+        if web_enabled():
             if args.mode is not None and args.mode != "deepseek":
                 raise HTTPException(422, "网页版使用 DeepSeek 模式。")
             values["mode"] = "deepseek"

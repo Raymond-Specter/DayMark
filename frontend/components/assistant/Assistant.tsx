@@ -34,6 +34,7 @@ import {
   type ConversationDetail,
 } from "@/lib/ai";
 import ModelSettingsDrawer from "./ModelSettingsDrawer";
+import { downloadWorkspaceFile, isGuest, workspaceFetch } from "@/lib/guest";
 import ClarificationCard from "./ClarificationCard";
 import "./assistant.css";
 
@@ -123,7 +124,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
       requestId.current++;
       controller.current?.abort();
       if (sending.current && activeId.current) {
-        void fetch(`/api/ai/conversations/${activeId.current}/stop`, {
+        void workspaceFetch(`/api/ai/conversations/${activeId.current}/stop`, {
           method: "POST",
           keepalive: true,
         });
@@ -312,7 +313,7 @@ export default function Assistant({ changed }: { changed?: () => void }) {
     setError("");
     try {
       const id = await ensureConversation();
-      const response = await fetch(
+      const response = await workspaceFetch(
         `/api/ai/conversations/${id}/attachments?filename=${encodeURIComponent(file.name)}`,
         { method: "POST", headers: { "Content-Type": file.type || "application/octet-stream" }, body: file },
       );
@@ -573,7 +574,11 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                       {m.attachments && m.attachments.length > 0 && (
                         <div className="ai-message-attachments">
                           {m.attachments.map((attachment) => (
-                            <a key={attachment.id} href={`/api/ai/attachments/${attachment.id}`}>
+                            <a key={attachment.id} href={`/api/ai/attachments/${attachment.id}`} onClick={(event) => {
+                              if (!isGuest()) return;
+                              event.preventDefault();
+                              void downloadWorkspaceFile(`/api/ai/attachments/${attachment.id}`, attachment.filename).catch((error) => setError(error.message));
+                            }}>
                               <FileText size={15} />
                               <span>{attachment.filename}</span>
                             </a>
@@ -591,6 +596,11 @@ export default function Assistant({ changed }: { changed?: () => void }) {
                                   href={href}
                                   target="_blank"
                                   rel="noopener noreferrer"
+                                  onClick={(event) => {
+                                    if (!isGuest() || !href?.startsWith("/api/")) return;
+                                    event.preventDefault();
+                                    void downloadWorkspaceFile(href).catch((error) => setError(error.message));
+                                  }}
                                 >
                                   {children}
                                 </a>

@@ -2,13 +2,13 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlparse
-from ...runtime import cloud_enabled
+from ...runtime import cloud_enabled, guest_context
 
 ENV_PATH = Path(__file__).resolve().parents[4] / ".env"
 
 
 def load_env():
-    if cloud_enabled():
+    if cloud_enabled() or guest_context.get() is not None:
         return
     # Explicit KEY=VALUE only: never execute a .env file as a shell script.
     path = ENV_PATH
@@ -25,6 +25,11 @@ def save_env_secret(name: str, value: str):
         raise ValueError("不支持的密钥名称")
     if not value or "\n" in value or "\r" in value:
         raise ValueError("API Key 格式无效")
+    guest = guest_context.get()
+    if guest is not None:
+        guest.api_key = value
+        guest.key_supplied = True
+        return
     if cloud_enabled():
         from ...accounts import save_api_key
         save_api_key(value)
@@ -85,7 +90,11 @@ class LLMConfig:
             deepseek_think_default=env_value("DEEPSEEK_THINKING_DEFAULT", "false").lower() == "true",
             default_mode=env_value("LLM_DEFAULT_MODE", "auto").lower(),
         )
-        if cloud_enabled():
+        guest = guest_context.get()
+        if guest is not None:
+            config.deepseek_api_key = guest.api_key
+            config.default_mode = "deepseek"
+        elif cloud_enabled():
             from ...accounts import read_api_key
             config.deepseek_api_key = read_api_key()
             config.default_mode = "deepseek"

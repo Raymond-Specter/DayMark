@@ -4,15 +4,16 @@ import { createContext, useCallback, useContext, useEffect, useState } from "rea
 import { LogOut, ArrowRight, LoaderCircle } from "lucide-react";
 import { api, send } from "@/lib/api";
 import { loadLanguage, uiText } from "@/lib/i18n";
+import { enterGuest, leaveGuest, remembersGuest } from "@/lib/guest";
 
 type User = { id: string; username: string };
-type Session = { mode: "local" | "cloud"; user: User | null };
-const AccountContext = createContext({ cloud: false, user: null as User | null, logout: async () => {} });
+type Session = { mode: "local" | "cloud" | "guest"; user: User | null };
+const AccountContext = createContext({ cloud: false, guest: false, user: null as User | null, logout: async () => {} });
 export const useAccount = () => useContext(AccountContext);
 
 export function SignOut() {
-  const { cloud, logout } = useAccount();
-  return cloud ? <button className="icon-button" title={uiText("退出登录")} aria-label={uiText("退出登录")} onClick={() => void logout()}><LogOut size={17} /></button> : null;
+  const { cloud, guest, logout } = useAccount();
+  return cloud ? <button className="icon-button" title={uiText(guest ? "返回登录" : "退出登录")} aria-label={uiText(guest ? "返回登录" : "退出登录")} onClick={() => void logout()}><LogOut size={17} /></button> : null;
 }
 
 export default function AccountGate({ children }: { children: React.ReactNode }) {
@@ -21,19 +22,34 @@ export default function AccountGate({ children }: { children: React.ReactNode })
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const refresh = useCallback(async () => {
-    try { setSession(await api<Session>("/auth/session", { cache: "no-store" })); setError(""); }
+    try {
+      if (remembersGuest()) { await enterGuest(); setSession({ mode: "guest", user: null }); }
+      else setSession(await api<Session>("/auth/session", { cache: "no-store" }));
+      setError("");
+    }
     catch (e) { setError((e as Error).message); }
   }, []);
   useEffect(() => {
     loadLanguage();
     void refresh();
     const expired = () => { setSession(null); void refresh(); };
+    const modeChanged = (event: StorageEvent) => { if (event.key === "daymark.guest") window.location.reload(); };
     window.addEventListener("daymark-session-expired", expired);
-    return () => window.removeEventListener("daymark-session-expired", expired);
+    window.addEventListener("storage", modeChanged);
+    return () => { window.removeEventListener("daymark-session-expired", expired); window.removeEventListener("storage", modeChanged); };
   }, [refresh]);
   async function logout() {
-    try { await send("/auth/logout", {}); setSession({ mode: "cloud", user: null }); }
+    try {
+      if (session?.mode === "guest") { await leaveGuest(); window.location.reload(); return; }
+      await send("/auth/logout", {}); setSession({ mode: "cloud", user: null });
+    }
     catch (e) { setError((e as Error).message); }
+  }
+  async function visit() {
+    setBusy(true); setError("");
+    try { await enterGuest(); setSession({ mode: "guest", user: null }); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
   }
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault(); setBusy(true); setError("");
@@ -47,8 +63,8 @@ export default function AccountGate({ children }: { children: React.ReactNode })
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
-  if (session && (session.mode === "local" || session.user)) {
-    return <AccountContext.Provider value={{ cloud: session.mode === "cloud", user: session.user, logout }}>{error && <p className="account-error" role="alert">{error}</p>}{children}</AccountContext.Provider>;
+  if (session && (session.mode === "local" || session.mode === "guest" || session.user)) {
+    return <AccountContext.Provider value={{ cloud: session.mode !== "local", guest: session.mode === "guest", user: session.user, logout }}>{error && <p className="account-error" role="alert">{error}</p>}{children}</AccountContext.Provider>;
   }
   return <main className="account-screen">
     <div className="account-intro"><span className="account-wordmark">DAYMARK.</span><h1>{uiText("给每一天，留一点空间。")}</h1><span>PLAN YOUR DAY. KEEP YOUR PROGRESS.</span></div>
@@ -63,6 +79,10 @@ export default function AccountGate({ children }: { children: React.ReactNode })
           <button className="button primary" disabled={busy}>{uiText(register ? "创建账号" : "登录")}{busy ? <LoaderCircle className="spin" size={18} /> : <ArrowRight size={18} />}</button>
         </form>
         <button className="account-switch" disabled={busy} onClick={() => { setRegister(!register); setError(""); }}>{uiText(register ? "已有账号？登录" : "有邀请码？创建账号")}</button>
+        <div className="account-guest">
+          <button className="button secondary" disabled={busy} onClick={() => void visit()}>{uiText("以访客身份进入")}<ArrowRight size={18} /></button>
+          <p>{uiText("记录仅保存在此浏览器，清除网站数据会删除记录。")}</p>
+        </div>
       </>}
     </section>
   </main>;

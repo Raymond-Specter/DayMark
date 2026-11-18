@@ -4,7 +4,7 @@ from threading import RLock
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, sessionmaker
-from .runtime import cloud_enabled, cloud_data, current_user_id, user_directory
+from .runtime import cloud_enabled, cloud_data, current_user_id, user_directory, guest_context
 
 ROOT = Path(__file__).resolve().parents[2]
 DATA = cloud_data() if cloud_enabled() else ROOT / "data"
@@ -62,6 +62,7 @@ def clear_tenant_factories():
 
 
 def get_db():
-    factory = tenant_factory(current_user_id()) if cloud_enabled() else SessionLocal
+    guest = guest_context.get()
+    factory = guest.factory if guest is not None else (tenant_factory(current_user_id()) if cloud_enabled() else SessionLocal)
     with factory() as session:
         yield session

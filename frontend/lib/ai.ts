@@ -1,5 +1,6 @@
 import { api } from "./api";
 import { uiText, uiFormat } from "./i18n";
+import { isGuest, workspaceFetch } from "./guest";
 
 export interface ModelSettings {
   mode: "auto" | "deepseek" | "local";
@@ -110,7 +111,7 @@ export async function aiRequest<T>(
 ): Promise<T> {
   try {
     return await api<T>(`/ai${path}`, {
-      signal: AbortSignal.timeout(10000),
+      ...(!isGuest() && { signal: AbortSignal.timeout(10000) }),
       ...options,
     });
   } catch (error) {
@@ -131,7 +132,7 @@ export async function streamChat(
   receive: (event: ChatEvent) => void,
   reply?: ClarificationReply,
 ) {
-  const response = await fetch("/api/ai/chat", {
+  const response = await workspaceFetch("/api/ai/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     signal,

@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from ..ai_schemas import ChatIn, ConfirmationIn, ConversationIn, DeepSeekKeyIn, ModelSettings
 from ..database import SessionLocal, get_db, tenant_factory
-from ..runtime import cloud_enabled, current_user_id
+from ..runtime import web_enabled, current_user_id, guest_context
 from ..models import AISettings, AgentActionLog, ChatAttachment, Conversation, PendingAgentAction
 from ..agent.agent_service import AgentService
 from ..agent.registry import build_registry
@@ -52,7 +52,12 @@ def build_service(factory):
 
 async def get_service():
     # Resolve on the event loop, so simultaneous first requests share one owner.
-    if cloud_enabled():
+    guest = guest_context.get()
+    if guest is not None:
+        if guest.service is None:
+            guest.service = build_service(guest.factory)
+        return guest.service
+    if web_enabled():
         user_id = current_user_id()
         if user_id not in tenant_services:
             tenant_services[user_id] = build_service(tenant_factory(user_id))
@@ -100,7 +105,7 @@ async def save_deepseek_key(data: DeepSeekKeyIn, service=Depends(get_service)):
 
 @router.get("/models")
 async def models(service=Depends(get_service)):
-    if cloud_enabled():
+    if web_enabled():
         return []
     try:
         llm = service.llm.local if hasattr(service.llm, "local") else service.llm
@@ -116,7 +121,7 @@ def settings(db: Session = Depends(get_db), service=Depends(get_service)):
 
 @router.put("/settings")
 async def save_settings(data: ModelSettings, db: Session = Depends(get_db), service=Depends(get_service)):
-    if cloud_enabled() and data.mode != "deepseek":
+    if web_enabled() and data.mode != "deepseek":
         raise HTTPException(422, "网页版使用 DeepSeek 模式。")
     if service.active:
         raise HTTPException(409, "请先停止生成再修改模型设置。")

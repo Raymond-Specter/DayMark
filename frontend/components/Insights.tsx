@@ -1,5 +1,6 @@
 "use client";
 import { useAccount } from "@/components/AccountGate";
+import { guestBackup } from "@/lib/guest";
 import { uiText, uiFormat, type Language } from "@/lib/i18n";
 import type { Theme } from "@/lib/theme";
 import { useEffect, useState } from "react";
@@ -513,7 +514,7 @@ export function SettingsPage({
   onThemeChange: (next: Theme) => void;
 }) {
   const [timezone, setTimezone] = useState(data.settings.timezone);
-  const { cloud } = useAccount();
+  const { cloud, guest } = useAccount();
   const [dayStart, setDayStart] = useState(data.settings.day_start);
   const [permission, setPermission] = useState("default");
   const [busy, setBusy] = useState(false);
@@ -543,7 +544,7 @@ export function SettingsPage({
   }
   async function download() {
     try {
-      const backup = await api("/export");
+      const backup = guest ? await guestBackup() : await api("/export");
       const url = URL.createObjectURL(
         new Blob([JSON.stringify(backup, null, 2)], {
           type: "application/json",
@@ -684,7 +685,7 @@ export function SettingsPage({
           <div>
             <h3>{uiText("导出完整数据")}</h3>
             <p>
-              {uiText(cloud ? "将你账号内的规划记录导出为 JSON 文件。" : "将目标、项目、任务、完成记录与每日复盘导出为 JSON 文件。数据保存在本机 SQLite 数据库中。")}
+              {uiText(guest ? "记录、聊天与附件保存在此浏览器，不与账号同步。备份包含访客记录和附件，不包含 API Key。AI 与文件解析需要联网；后端临时处理后清理。" : cloud ? "将你账号内的规划记录导出为 JSON 文件。" : "将目标、项目、任务、完成记录与每日复盘导出为 JSON 文件。数据保存在本机 SQLite 数据库中。")}
             </p>
           </div>
           <button

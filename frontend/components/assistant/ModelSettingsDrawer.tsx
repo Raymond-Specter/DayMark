@@ -16,7 +16,7 @@ export default function ModelSettingsDrawer({
   saved: () => void;
   deepseekConfigured: boolean;
 }) {
-  const { cloud } = useAccount();
+  const { cloud, guest } = useAccount();
   const dialog = useRef<HTMLDialogElement>(null);
   const [draft, setDraft] = useState(value);
   const [models, setModels] = useState<{ name: string }[]>([]);
@@ -69,7 +69,7 @@ export default function ModelSettingsDrawer({
             <X size={20} />
           </button>
         </div>
-        <p>{uiText(cloud ? "设置保存在你的账号中，下次对话自动沿用。" : "设置保存在本机，下次对话自动沿用。每次仅生成一个回答。")}</p>
+        <p>{uiText(guest ? "访客设置保存在此浏览器，AI 功能需要联网并填写你自己的 API Key。" : cloud ? "设置保存在你的账号中，下次对话自动沿用。" : "设置保存在本机，下次对话自动沿用。每次仅生成一个回答。")}</p>
         <div className="ai-key-panel">
           <label>
             DeepSeek API Key
@@ -83,7 +83,7 @@ export default function ModelSettingsDrawer({
             />
           </label>
           <small className={deepseekConfigured ? "configured" : ""}>
-            {cloud ? uiText(deepseekConfigured ? "✓ 已配置，在服务器加密保存，仅供你的账号使用。" : "Key 在服务器加密保存，不会回显或写入聊天记录。") : deepseekConfigured ? uiText("✓ 已配置，仅保存在本机项目 .env") : uiText("未配置。Key 不会显示在页面、数据库或聊天记录中。")}
+            {guest ? uiText("Key 保存在此浏览器，仅在 AI 请求期间交给后端调用，不写入服务器账号库。") : cloud ? uiText(deepseekConfigured ? "✓ 已配置，在服务器加密保存，仅供你的账号使用。" : "Key 在服务器加密保存，不会回显或写入聊天记录。") : deepseekConfigured ? uiText("✓ 已配置，仅保存在本机项目 .env") : uiText("未配置。Key 不会显示在页面、数据库或聊天记录中。")}
           </small>
         </div>
         <label>

@@ -14,7 +14,7 @@ from xml.etree import ElementTree
 
 from fastapi import HTTPException
 from ..database import DATA, ROOT
-from ..runtime import cloud_enabled, user_directory
+from ..runtime import web_enabled, user_directory
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
 MAX_EXTRACTED_CHARS = 9000
@@ -403,7 +403,7 @@ def _find_command(name, candidate=""):
 
 
 def save_upload(filename: str, content: bytes):
-    directory = user_directory() / "uploads" if cloud_enabled() else UPLOAD_DIR
+    directory = user_directory() / "uploads" if web_enabled() else UPLOAD_DIR
     directory.mkdir(parents=True, exist_ok=True)
     storage_name = f"{uuid4().hex}{Path(filename).suffix.lower()}"
     (directory / storage_name).write_bytes(content)
@@ -415,7 +415,7 @@ def delete_upload(storage_name: str):
 
 
 def attachment_path(storage_name: str):
-    directory = user_directory() / "uploads" if cloud_enabled() else UPLOAD_DIR
+    directory = user_directory() / "uploads" if web_enabled() else UPLOAD_DIR
     return directory / Path(storage_name).name
 
 

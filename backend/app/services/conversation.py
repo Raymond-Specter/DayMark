@@ -12,7 +12,7 @@ from sqlalchemy.orm import sessionmaker
 
 from ..ai_schemas import ModelSettings
 from ..agent.clarification import answer_question
-from ..runtime import cloud_enabled
+from ..runtime import web_enabled
 from ..models import AISettings, ChatAttachment, ChatMessage, Conversation, PendingAgentAction, now_iso
 from .common import require
 from .llm.base import GenerationOptions, LLMError, Message
@@ -25,7 +25,7 @@ SYSTEM_PROMPT = (Path(__file__).resolve().parents[1] / "prompts/planner_system_p
 
 def read_settings(db, config: LLMConfig):
     row = db.get(AISettings, 1)
-    if cloud_enabled() and row and row.mode != "deepseek":
+    if web_enabled() and row and row.mode != "deepseek":
         return ModelSettings(mode="deepseek", model=row.model, num_ctx=row.num_ctx, temperature=float(row.temperature), think=row.think)
     return ModelSettings(mode=row.mode, model=row.model, num_ctx=row.num_ctx, temperature=float(row.temperature), think=row.think) if row else ModelSettings(
         mode=config.default_mode, model=config.model, num_ctx=config.num_ctx, temperature=config.temperature, think=config.think)

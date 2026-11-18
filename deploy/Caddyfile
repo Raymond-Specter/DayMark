@@ -6,7 +6,12 @@
         Referrer-Policy same-origin
         Strict-Transport-Security "max-age=31536000"
     }
-    request_body {
+    @guest path /api/guest
+    request_body @guest {
+        max_size 134217728
+    }
+    @regular not path /api/guest
+    request_body @regular {
         max_size 25MB
     }
     handle /api/* {

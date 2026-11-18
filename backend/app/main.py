@@ -15,6 +15,7 @@ from .database import SessionLocal, get_db, tenant_factory
 from .runtime import cloud_enabled, user_context
 from . import accounts
 from .api.auth import router as auth_router
+from .guest import router as guest_router
 from .api.ai import tenant_services
 from .models import (CalendarEvent, DailyReview, Goal, KnowledgeDocument, LearningEntry,
                      Milestone, Notification, Project, Routine, Task, TaskHistory, now_iso)
@@ -65,6 +66,7 @@ app = FastAPI(title="Personal Planning System", version="1.0.0", lifespan=lifesp
 app.include_router(ai_router)
 app.include_router(learning_router)
 app.include_router(auth_router)
+app.include_router(guest_router)
 
 
 @app.middleware("http")
@@ -72,7 +74,7 @@ async def local_mutation_guard(request: Request, call_next):
     # Cloud requests use authenticated, request-local database/storage context.
     token = None
     if cloud_enabled():
-        public = {"/health", "/api/auth/session", "/api/auth/login", "/api/auth/register", "/api/auth/logout"}
+        public = {"/health", "/api/auth/session", "/api/auth/login", "/api/auth/register", "/api/auth/logout", "/api/guest", "/api/guest/stop"}
         if request.url.path not in public:
             from starlette.concurrency import run_in_threadpool
             user = await run_in_threadpool(accounts.session_user, request.cookies.get(accounts.COOKIE))

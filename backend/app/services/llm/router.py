@@ -2,6 +2,7 @@ from dataclasses import replace
 
 from .base import LLMError
 from .service import LLMService
+from ...runtime import guest_context
 
 
 RECOVERABLE = {"not_configured", "timeout", "offline", "provider_unavailable", "rate_limited"}
@@ -47,7 +48,8 @@ class ProviderRouter:
                 deepseek["online"] = True
             except LLMError as error:
                 deepseek["error"] = error.message
-        local = await self.local.health(local_model)
+        local = ({"ollama_available": False, "model_available": False, "error": "访客模式使用 DeepSeek。"}
+                 if guest_context.get() is not None else await self.local.health(local_model))
         return {
             "deepseek": deepseek,
             "local": {"configured": True, "online": local["ollama_available"],
